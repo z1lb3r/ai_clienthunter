@@ -1,7 +1,7 @@
 # backend/app/services/client_monitoring_service.py
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 import re
 
@@ -77,58 +77,176 @@ class ClientMonitoringService:
 
     
     async def _search_and_analyze(self, user_id: int, settings: Dict[str, Any]):
-        """Поиск ключевых слов и анализ найденных сообщений"""
+        """Поиск ключевых слов и анализ найденных сообщений - С ДЕТАЛЬНОЙ ДИАГНОСТИКОЙ"""
         try:
-            # Получаем шаблоны продуктов пользователя
+            print(f"🔎 CLIENT_MONITOR: Starting search and analyze for user {user_id}")
+            print(f"🔎 CLIENT_MONITOR: Settings received: {settings}")
+            logger.info(f"🔎 CLIENT_MONITOR: Starting search and analyze for user {user_id}")
+            
+            # === ЭТАП 1: Получение шаблонов ===
+            print("📝 CLIENT_MONITOR: Step 1 - Getting user templates...")
             templates = await self._get_user_templates(user_id)
+            print(f"📝 CLIENT_MONITOR: Retrieved {len(templates)} templates from database")
+            
             if not templates:
+                print("❌ CLIENT_MONITOR: No templates found - stopping analysis")
                 logger.info(f"No templates for user {user_id}")
                 return
             
-            # Получаем чаты для мониторинга
+            # Детальная информация о каждом шаблоне
+            for i, template in enumerate(templates):
+                print(f"📝 CLIENT_MONITOR: Template {i+1}: '{template.get('name', 'UNNAMED')}'")
+                print(f"📝 CLIENT_MONITOR: Template {i+1} ID: {template.get('id')}")
+                
+                # ЗДЕСЬ ГЛАВНАЯ ПРОБЛЕМА - keywords могут быть строкой вместо массива
+                keywords_raw = template.get('keywords', [])
+                print(f"📝 CLIENT_MONITOR: Template {i+1} keywords (RAW): {keywords_raw}")
+                print(f"📝 CLIENT_MONITOR: Template {i+1} keywords TYPE: {type(keywords_raw)}")
+                
+                # Проверяем и парсим keywords
+                if isinstance(keywords_raw, str):
+                    print(f"⚠️ CLIENT_MONITOR: Keywords is STRING, need to parse JSON: {keywords_raw}")
+                    try:
+                        import json
+                        keywords_parsed = json.loads(keywords_raw)
+                        print(f"✅ CLIENT_MONITOR: Successfully parsed keywords: {keywords_parsed}")
+                        template['keywords'] = keywords_parsed  # Обновляем в template
+                    except Exception as parse_error:
+                        print(f"❌ CLIENT_MONITOR: Failed to parse keywords JSON: {parse_error}")
+                        print(f"❌ CLIENT_MONITOR: Skipping template {i+1} due to keywords error")
+                        continue
+                elif isinstance(keywords_raw, list):
+                    print(f"✅ CLIENT_MONITOR: Keywords is already LIST: {keywords_raw}")
+                else:
+                    print(f"❌ CLIENT_MONITOR: Keywords has unexpected type: {type(keywords_raw)}")
+                    continue
+                
+                final_keywords = template.get('keywords', [])
+                print(f"📝 CLIENT_MONITOR: Template {i+1} FINAL keywords: {final_keywords}")
+            
+            # === ЭТАП 2: Получение чатов ===
+            print("💬 CLIENT_MONITOR: Step 2 - Getting monitored chats...")
             monitored_chats = settings.get('monitored_chats', [])
+            print(f"💬 CLIENT_MONITOR: Found {len(monitored_chats)} monitored chats: {monitored_chats}")
+            
             if not monitored_chats:
+                print("❌ CLIENT_MONITOR: No monitored chats - stopping analysis")
                 logger.info(f"No monitored chats for user {user_id}")
                 return
             
-            # Получаем настройки
+            # === ЭТАП 3: Получение настроек ===
+            print("⚙️ CLIENT_MONITOR: Step 3 - Processing settings...")
             lookback_minutes = settings.get('lookback_minutes', 5)
             min_ai_confidence = settings.get('min_ai_confidence', 7)
+            print(f"⚙️ CLIENT_MONITOR: Lookback minutes: {lookback_minutes}")
+            print(f"⚙️ CLIENT_MONITOR: Min AI confidence: {min_ai_confidence}")
             
-            # Для каждого чата ищем новые сообщения
-            for chat_id in monitored_chats:
+            # === ЭТАП 4: Обработка каждого чата ===
+            print(f"🔄 CLIENT_MONITOR: Step 4 - Processing {len(monitored_chats)} chats...")
+            
+            total_messages_found = 0
+            total_keyword_matches = 0
+            
+            for chat_index, chat_id in enumerate(monitored_chats):
                 try:
-                    # Получаем последние сообщения из чата
-                    recent_messages = await self._get_recent_messages(chat_id, lookback_minutes)
+                    print(f"💬 CLIENT_MONITOR: === Processing chat {chat_index+1}/{len(monitored_chats)}: {chat_id} ===")
                     
-                    # Для каждого шаблона ищем ключевые слова
-                    for template in templates:
+                    # === ЭТАП 4.1: Получение сообщений ===
+                    print(f"📥 CLIENT_MONITOR: Getting recent messages from chat {chat_id}...")
+                    print(f"📥 CLIENT_MONITOR: Calling _get_recent_messages({chat_id}, {lookback_minutes})")
+                    
+                    recent_messages = await self._get_recent_messages(chat_id, lookback_minutes)
+                    print(f"📥 CLIENT_MONITOR: Retrieved {len(recent_messages)} recent messages from chat {chat_id}")
+                    total_messages_found += len(recent_messages)
+                    
+                    if not recent_messages:
+                        print(f"⚠️ CLIENT_MONITOR: No recent messages in chat {chat_id} - skipping")
+                        continue
+                    
+                    # Показываем примеры сообщений
+                    for msg_i, msg in enumerate(recent_messages[:3]):  # Показываем первые 3
+                        msg_text = msg.get('text', '')[:100]  # Первые 100 символов
+                        print(f"📄 CLIENT_MONITOR: Message {msg_i+1}: '{msg_text}...'")
+                    
+                    # === ЭТАП 4.2: Поиск по шаблонам ===
+                    print(f"🔍 CLIENT_MONITOR: Searching through {len(templates)} templates...")
+                    
+                    for template_index, template in enumerate(templates):
+                        template_name = template.get('name', f'Template_{template_index}')
                         keywords = template.get('keywords', [])
+                        
+                        print(f"🔍 CLIENT_MONITOR: === Template {template_index+1}: '{template_name}' ===")
+                        print(f"🔍 CLIENT_MONITOR: Searching for keywords: {keywords}")
+                        
                         if not keywords:
+                            print(f"⚠️ CLIENT_MONITOR: No keywords in template '{template_name}' - skipping")
                             continue
                         
-                        # Ищем сообщения с ключевыми словами
-                        for message in recent_messages:
+                        # === ЭТАП 4.3: Поиск ключевых слов в сообщениях ===
+                        template_matches = 0
+                        for message_index, message in enumerate(recent_messages):
                             message_text = message.get('text', '')
+                            
+                            if not message_text:
+                                continue
+                            
+                            print(f"🔎 CLIENT_MONITOR: Checking message {message_index+1} with template '{template_name}'")
+                            print(f"🔎 CLIENT_MONITOR: Message text: '{message_text[:150]}...'")
+                            
                             matched_keywords = self._find_keywords_in_text(message_text, keywords)
                             
                             if matched_keywords:
-                                # Подготавливаем данные для анализа ИИ
+                                template_matches += 1
+                                total_keyword_matches += 1
+                                
+                                print(f"🎯 CLIENT_MONITOR: MATCH FOUND! Keywords: {matched_keywords}")
+                                print(f"🎯 CLIENT_MONITOR: Message: '{message_text}'")
+                                
+                                # === ЭТАП 4.4: Подготовка данных для ИИ ===
+                                print(f"🤖 CLIENT_MONITOR: Preparing data for AI analysis...")
                                 message_data = {
                                     'message': message,
                                     'template': template,
                                     'matched_keywords': matched_keywords
                                 }
                                 
-                                # Анализируем через ИИ
-                                await self._analyze_message_with_ai(user_id, message_data, settings)
-                
-                except Exception as e:
-                    logger.error(f"Error processing chat {chat_id}: {e}")
+                                print(f"🤖 CLIENT_MONITOR: Message data prepared: {list(message_data.keys())}")
+                                
+                                # === ЭТАП 4.5: Анализ через ИИ ===
+                                print(f"🤖 CLIENT_MONITOR: Calling AI analysis...")
+                                try:
+                                    await self._analyze_message_with_ai(user_id, message_data, settings)
+                                    print(f"✅ CLIENT_MONITOR: AI analysis completed successfully")
+                                except Exception as ai_error:
+                                    print(f"❌ CLIENT_MONITOR: AI analysis failed: {ai_error}")
+                                    logger.error(f"AI analysis error: {ai_error}")
+                            else:
+                                print(f"❌ CLIENT_MONITOR: No keywords found in message {message_index+1}")
+                        
+                        print(f"📊 CLIENT_MONITOR: Template '{template_name}' matches: {template_matches}")
+                    
+                    print(f"✅ CLIENT_MONITOR: Completed processing chat {chat_id}")
+                    
+                except Exception as chat_error:
+                    print(f"❌ CLIENT_MONITOR: Error processing chat {chat_id}: {chat_error}")
+                    logger.error(f"Error processing chat {chat_id}: {chat_error}")
+                    import traceback
+                    print(f"❌ CLIENT_MONITOR: Chat error traceback: {traceback.format_exc()}")
                     continue
             
+            # === ФИНАЛЬНАЯ СТАТИСТИКА ===
+            print(f"📊 CLIENT_MONITOR: === FINAL STATISTICS ===")
+            print(f"📊 CLIENT_MONITOR: Total chats processed: {len(monitored_chats)}")
+            print(f"📊 CLIENT_MONITOR: Total messages found: {total_messages_found}")
+            print(f"📊 CLIENT_MONITOR: Total keyword matches: {total_keyword_matches}")
+            print(f"✅ CLIENT_MONITOR: Search and analyze completed successfully")
+            
         except Exception as e:
+            print(f"❌ CLIENT_MONITOR: CRITICAL ERROR in search and analyze: {e}")
             logger.error(f"Error in search and analyze: {e}")
+            import traceback
+            print(f"❌ CLIENT_MONITOR: Critical error traceback: {traceback.format_exc()}")
+            raise
     
     async def _get_user_templates(self, user_id: int) -> List[Dict[str, Any]]:
         """Получить активные шаблоны пользователя"""
@@ -142,36 +260,92 @@ class ClientMonitoringService:
             return []
     
     async def _get_recent_messages(self, chat_id: str, lookback_minutes: int) -> List[Dict[str, Any]]:
-        """Получить последние сообщения из чата"""
+        """Получить сообщения за последние N минут - ПРАВИЛЬНАЯ ВЕРСИЯ"""
         try:
-            # Рассчитываем время для поиска сообщений
-            lookback_days = max(1, lookback_minutes // (24 * 60))  # Минимум 1 день
+            print(f"📥 CLIENT_MONITOR: Getting messages from last {lookback_minutes} minutes from chat {chat_id}")
             
-            # Получаем сообщения через Telegram service
-            messages = await self.telegram_service.get_group_messages(
-                group_id=chat_id,
-                limit=100,  # Ограничиваем количество для скорости
-                days_back=lookback_days,
-                get_users=True
-            )
+            # Вычисляем точное время cutoff
+            cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=lookback_minutes)
+            print(f"📥 CLIENT_MONITOR: Cutoff time (UTC): {cutoff_time}")
             
-            # Фильтруем сообщения по времени
-            cutoff_time = datetime.now() - timedelta(minutes=lookback_minutes)
+            # Проверяем доступные методы TelegramService
+            print(f"📥 CLIENT_MONITOR: TelegramService methods: {[method for method in dir(self.telegram_service) if not method.startswith('_')]}")
             
-            recent_messages = []
-            for msg in messages:
-                try:
-                    msg_time = datetime.fromisoformat(msg['date'].replace('Z', '+00:00'))
-                    if msg_time >= cutoff_time:
-                        recent_messages.append(msg)
-                except:
-                    continue
+            # Получаем сообщения с фильтрацией по времени через Telegram API
+            print(f"📥 CLIENT_MONITOR: Calling telegram_service.get_group_messages with offset_date...")
             
-            return recent_messages
+            try:
+                # Первый способ: используем offset_date для точной фильтрации по времени
+                messages = await self.telegram_service.get_group_messages(
+                    group_id=chat_id,
+                    offset_date=cutoff_time  # Telegram API вернет только сообщения ПОСЛЕ этого времени
+                )
+                print(f"✅ CLIENT_MONITOR: Got {len(messages)} messages using offset_date filter")
+                
+            except Exception as api_error:
+                print(f"⚠️ CLIENT_MONITOR: offset_date failed: {api_error}")
+                print(f"🔄 CLIENT_MONITOR: Trying fallback method...")
+                
+                # Fallback: получаем разумное количество сообщений и фильтруем сами
+                # В очень активном чате может быть до 100 сообщений в минуту
+                estimated_limit = max(500, lookback_minutes * 100)
+                print(f"📥 CLIENT_MONITOR: Using fallback with limit={estimated_limit}")
+                
+                all_messages = await self.telegram_service.get_group_messages(
+                    group_id=chat_id,
+                    limit=estimated_limit
+                )
+                
+                # Фильтруем по времени
+                print(f"📥 CLIENT_MONITOR: Filtering {len(all_messages)} messages by time...")
+                messages = []
+                
+                for msg in all_messages:
+                    try:
+                        msg_date = msg.get('date', '')
+                        if not msg_date:
+                            continue
+                        
+                        # Парсим дату
+                        if msg_date.endswith('Z'):
+                            msg_time = datetime.fromisoformat(msg_date.replace('Z', '+00:00'))
+                        elif '+' in msg_date or msg_date.endswith('+00:00'):
+                            msg_time = datetime.fromisoformat(msg_date)
+                        else:
+                            msg_time = datetime.fromisoformat(msg_date).replace(tzinfo=timezone.utc)
+                        
+                        # Проверяем время
+                        if msg_time >= cutoff_time:
+                            messages.append(msg)
+                        else:
+                            # Сообщения отсортированы по убыванию времени - можно остановиться
+                            print(f"📥 CLIENT_MONITOR: Reached old message from {msg_time}, stopping")
+                            break
+                            
+                    except Exception as parse_error:
+                        print(f"⚠️ CLIENT_MONITOR: Error parsing message date: {parse_error}")
+                        continue
+                
+                print(f"✅ CLIENT_MONITOR: Filtered to {len(messages)} recent messages")
+            
+            # Показываем примеры найденных сообщений
+            if messages:
+                print(f"📊 CLIENT_MONITOR: Sample messages:")
+                for i, msg in enumerate(messages[:3]):
+                    msg_text = msg.get('text', '')[:50]
+                    msg_date = msg.get('date', 'No date')
+                    print(f"📄 CLIENT_MONITOR: Message {i+1}: '{msg_text}...' at {msg_date}")
+            else:
+                print(f"⚠️ CLIENT_MONITOR: No messages found in last {lookback_minutes} minutes")
+            
+            return messages
             
         except Exception as e:
+            print(f"❌ CLIENT_MONITOR: Error getting recent messages from {chat_id}: {e}")
             logger.error(f"Error getting recent messages from {chat_id}: {e}")
-            return []
+            import traceback
+            print(f"❌ CLIENT_MONITOR: Traceback: {traceback.format_exc()}")
+        return []
     
     def _find_keywords_in_text(self, text: str, keywords: List[str]) -> List[str]:
         """Найти ключевые слова в тексте"""
@@ -292,13 +466,11 @@ class ClientMonitoringService:
                 'chat_id': message.get('chat', {}).get('id'),
                 'chat_title': message.get('chat', {}).get('title'),
                 'author_username': author.get('username'),
-                'author_first_name': author.get('first_name'),
                 'author_telegram_id': author.get('id'),
                 'message_text': message.get('text', '')[:1000],  # Ограничиваем длину
                 'matched_keywords': message_data['matched_keywords'],
                 'ai_confidence': ai_result.get('confidence', 0),
                 'ai_intent_type': ai_result.get('intent_type', 'unknown'),
-                'ai_reasoning': ai_result.get('reasoning', ''),
                 'client_status': 'new',
                 'notification_sent': False,
                 'created_at': datetime.now().isoformat()
