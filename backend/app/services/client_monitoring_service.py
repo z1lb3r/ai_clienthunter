@@ -215,7 +215,7 @@ class ClientMonitoringService:
                                 # === ЭТАП 4.5: Анализ через ИИ ===
                                 print(f"🤖 CLIENT_MONITOR: Calling AI analysis...")
                                 try:
-                                    await self._analyze_message_with_ai(user_id, message_data, settings)
+                                    await self._analyze_message_with_ai(user_id, chat_id, message_data, settings)
                                     print(f"✅ CLIENT_MONITOR: AI analysis completed successfully")
                                 except Exception as ai_error:
                                     print(f"❌ CLIENT_MONITOR: AI analysis failed: {ai_error}")
@@ -367,6 +367,7 @@ class ClientMonitoringService:
     async def _analyze_message_with_ai(
         self, 
         user_id: int, 
+        chat_id: str,
         message_data: Dict[str, Any], 
         settings: Dict[str, Any]
     ):
@@ -408,7 +409,7 @@ class ClientMonitoringService:
             min_confidence = settings.get('min_ai_confidence', 7)
             if ai_result.get('confidence', 0) >= min_confidence:
                 # Сохраняем потенциального клиента
-                await self._save_potential_client(user_id, message_data, ai_result)
+                await self._save_potential_client(user_id, chat_id, message_data, ai_result)
                 
                 # Отправляем уведомление
                 notification_account = settings.get('notification_account')
@@ -449,6 +450,7 @@ class ClientMonitoringService:
     async def _save_potential_client(
         self, 
         user_id: int, 
+        chat_id: str,   
         message_data: Dict[str, Any], 
         ai_result: Dict[str, Any]
     ):
@@ -456,7 +458,7 @@ class ClientMonitoringService:
         try:
             message = message_data['message']
             template = message_data['template']
-            author = message.get('sender', {})
+            author = message.get('user_info', {}) or {}
             
             # Подготавливаем данные для сохранения
             client_data = {
@@ -464,10 +466,10 @@ class ClientMonitoringService:
                 'product_template_id': template.get('id'),
                 'template_name': template.get('name'),               # ✅ ДОБАВИТЬ
                 'message_id': message.get('message_id'),
-                'chat_id': message.get('chat', {}).get('id'),
-                'chat_name': message.get('chat', {}).get('title'),   # ✅ ИСПРАВИТЬ
+                'chat_id': chat_id,
+                'chat_name': None,   # ✅ ИСПРАВИТЬ
                 'author_username': author.get('username'),
-                'author_id': str(author.get('id')),                  # ✅ ИСПРАВИТЬ
+                'author_id': author.get('telegram_id'),                  # ✅ ИСПРАВИТЬ
                 'message_text': message.get('text', '')[:1000],
                 'matched_keywords': message_data['matched_keywords'],
                 'ai_confidence': ai_result.get('confidence', 0),
