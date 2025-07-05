@@ -462,20 +462,22 @@ class ClientMonitoringService:
             client_data = {
                 'user_id': user_id,
                 'product_template_id': template.get('id'),
+                'template_name': template.get('name'),               # ✅ ДОБАВИТЬ
                 'message_id': message.get('message_id'),
                 'chat_id': message.get('chat', {}).get('id'),
-                'chat_title': message.get('chat', {}).get('title'),
+                'chat_name': message.get('chat', {}).get('title'),   # ✅ ИСПРАВИТЬ
                 'author_username': author.get('username'),
-                'author_telegram_id': author.get('id'),
-                'message_text': message.get('text', '')[:1000],  # Ограничиваем длину
+                'author_id': str(author.get('id')),                  # ✅ ИСПРАВИТЬ
+                'message_text': message.get('text', '')[:1000],
                 'matched_keywords': message_data['matched_keywords'],
                 'ai_confidence': ai_result.get('confidence', 0),
                 'ai_intent_type': ai_result.get('intent_type', 'unknown'),
+                'ai_explanation_text': ai_result.get('reasoning', ''), # ✅ ДОБАВИТЬ
                 'client_status': 'new',
                 'notification_sent': False,
                 'created_at': datetime.now().isoformat()
             }
-            
+                        
             result = supabase_client.table('potential_clients').insert(client_data).execute()
             
             if result.data:
