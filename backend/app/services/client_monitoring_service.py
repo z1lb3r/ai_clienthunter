@@ -547,27 +547,55 @@ class ClientMonitoringService:
             
             message = message_data['message']
             template = message_data['template']
-            author = message.get('sender', {})
+            author = message.get('user_info', {}) or {}
+            
+            # Формируем информацию об авторе
+            username = author.get('username')
+            first_name = author.get('first_name', 'Имя не указано')
+            author_id = author.get('telegram_id', 'ID неизвестен')
+
+            if username:
+                author_info = f"@{username} ({first_name})"
+            else:
+                author_info = f"{first_name} (ID: {author_id})"
+
+            # Формируем ссылку на сообщение
+            chat_id = message.get('chat', {}).get('id') or 'unknown'
+            message_id = message.get('message_id', 'unknown')
+            
+            # Убираем -100 из chat_id для ссылки
+            if str(chat_id).startswith('-100'):
+                clean_chat_id = str(chat_id)[4:]
+            else:
+                clean_chat_id = str(chat_id)
+                
+            message_link = f"https://t.me/c/{clean_chat_id}/{message_id}"
             
             # Формируем текст уведомления
             notification_text = f"""🔥 НАЙДЕН ПОТЕНЦИАЛЬНЫЙ КЛИЕНТ!
 
-💡 Продукт: {template['name']}
-📱 Сообщение: "{message.get('text', '')[:200]}..."
-👤 Автор: @{author.get('username', 'unknown')} ({author.get('first_name', 'Имя не указано')})
-💬 Чат: {message.get('chat', {}).get('title', 'Неизвестный чат')}
-🎯 Ключевые слова: {', '.join(message_data['matched_keywords'])}
-🤖 Уверенность ИИ: {ai_result.get('confidence', 0)}/10
-📊 Тип намерения: {ai_result.get('intent_type', 'unknown')}
-📅 Время: {datetime.now().strftime('%H:%M, %d.%m.%Y')}
+    💡 Продукт: {template['name']}
+    📱 Сообщение: "{message.get('text', '')[:200]}..."
+    👤 Автор: {author_info}
+    💬 Чат: {message.get('chat', {}).get('title', 'Неизвестный чат')}
+    🎯 Ключевые слова: {', '.join(message_data['matched_keywords'])}
+    🤖 Уверенность ИИ: {ai_result.get('confidence', 0)}/10
+    📊 Тип намерения: {ai_result.get('intent_type', 'unknown')}
+    📅 Время: {datetime.now().strftime('%H:%M, %d.%m.%Y')}
 
-👆 Переходи в чат и предлагай свой товар!"""
+    🔗 [Перейти к сообщению]({message_link})
 
-            # Здесь будет отправка через Telegram API
-            # Пока просто логируем
-            logger.info(f"NOTIFICATION: {notification_text}")
-            
-            # TODO: Реализовать отправку уведомления через Telegram
-            
+    👆 Переходи в чат и предлагай свой товар!"""
+
+            # Отправляем через Telegram API
+            try:
+                success = await self.telegram_service.send_private_message(notification_account, notification_text)
+                if success:
+                    logger.info(f"✅ Notification sent to {notification_account}")
+                else:
+                    logger.error(f"❌ Failed to send notification to {notification_account}")
+            except Exception as e:
+                logger.error(f"❌ Error sending Telegram notification: {e}")
+                
         except Exception as e:
             logger.error(f"Error sending notification: {e}")

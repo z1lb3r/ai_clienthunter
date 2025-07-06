@@ -165,7 +165,7 @@ class TelegramService:
     async def get_group_messages(
         self, 
         group_id: str, 
-        limit: int = 100,
+        limit: int = 2000,
         offset_date: Optional[datetime] = None,
         include_replies: bool = True,
         get_users: bool = True,
@@ -1276,4 +1276,21 @@ class TelegramService:
                 'total_comments': 0,
                 'processed_posts': 0
             }
+        
+    async def send_private_message(self, username: str, message: str) -> bool:
+        """Отправить личное сообщение пользователю"""
+        try:
+            await self.ensure_connected()
+            
+            # Убираем @ если есть
+            clean_username = username.lstrip('@')
+            
+            # Отправляем сообщение
+            await self.client.send_message(clean_username, message)
+            logger.info(f"✅ Sent notification to {username}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to send message to {username}: {e}")
+            return False
         
