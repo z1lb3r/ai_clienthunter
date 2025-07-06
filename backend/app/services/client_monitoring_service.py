@@ -150,7 +150,15 @@ class ClientMonitoringService:
             for chat_index, chat_id in enumerate(monitored_chats):
                 try:
                     print(f"💬 CLIENT_MONITOR: === Processing chat {chat_index+1}/{len(monitored_chats)}: {chat_id} ===")
-                    
+                    # Получаем название чата
+                    try:
+                        chat_info = await self.telegram_service.get_group_info(chat_id)
+                        chat_name = chat_info.get('title', f'Chat {chat_id}') if chat_info else f'Chat {chat_id}'
+                        print(f"📋 CLIENT_MONITOR: Chat name: '{chat_name}'")
+                    except Exception as chat_info_error:
+                        print(f"⚠️ CLIENT_MONITOR: Could not get chat info: {chat_info_error}")
+                        chat_name = f'Chat {chat_id}'  # Fallback название
+                        print(f"📋 CLIENT_MONITOR: Using fallback chat name: '{chat_name}'")
                     # === ЭТАП 4.1: Получение сообщений ===
                     print(f"📥 CLIENT_MONITOR: Getting recent messages from chat {chat_id}...")
                     print(f"📥 CLIENT_MONITOR: Calling _get_recent_messages({chat_id}, {lookback_minutes})")
@@ -215,7 +223,7 @@ class ClientMonitoringService:
                                 # === ЭТАП 4.5: Анализ через ИИ ===
                                 print(f"🤖 CLIENT_MONITOR: Calling AI analysis...")
                                 try:
-                                    await self._analyze_message_with_ai(user_id, chat_id, message_data, settings)
+                                    await self._analyze_message_with_ai(user_id, chat_id, chat_name, message_data, settings)
                                     print(f"✅ CLIENT_MONITOR: AI analysis completed successfully")
                                 except Exception as ai_error:
                                     print(f"❌ CLIENT_MONITOR: AI analysis failed: {ai_error}")
@@ -368,6 +376,7 @@ class ClientMonitoringService:
         self, 
         user_id: int, 
         chat_id: str,
+        chat_name: str,
         message_data: Dict[str, Any], 
         settings: Dict[str, Any]
     ):
@@ -402,14 +411,30 @@ class ClientMonitoringService:
             }}
             """
             
-            # Отправляем запрос к ИИ (здесь используется заглушка)
-            ai_result = await self._call_ai_analysis(ai_prompt)
+            # Подготавливаем данные автора
+            author_info = message.get('user_info', {}) or {}
+
+            # Подготавливаем данные чата
+            chat_info = {
+                'chat_id': chat_id,
+                'chat_name': chat_name
+            }
+
+            # Вызываем реальный ИИ анализ с полными данными
+            ai_result = await self._call_ai_analysis(
+                message_text=message.get('text', ''),
+                product_name=template['name'],
+                keywords=template['keywords'],
+                matched_keywords=matched_keywords,
+                author_info=author_info,
+                chat_info=chat_info
+            )
             
             # Проверяем минимальную уверенность
             min_confidence = settings.get('min_ai_confidence', 7)
             if ai_result.get('confidence', 0) >= min_confidence:
                 # Сохраняем потенциального клиента
-                await self._save_potential_client(user_id, chat_id, message_data, ai_result)
+                await self._save_potential_client(user_id, chat_id, chat_name, message_data, ai_result)
                 
                 # Отправляем уведомление
                 notification_account = settings.get('notification_account')
@@ -432,25 +457,45 @@ class ClientMonitoringService:
             logger.error(f"Error checking if message processed: {e}")
             return False
     
-    async def _call_ai_analysis(self, prompt: str) -> Dict[str, Any]:
-        """Вызов ИИ для анализа (заглушка)"""
+    async def _call_ai_analysis(self, 
+                            message_text: str,
+                            product_name: str, 
+                            keywords: List[str],
+                            matched_keywords: List[str],
+                            author_info: Dict[str, Any],
+                            chat_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Вызов ИИ для анализа с полными данными"""
         try:
-            # TODO: Реализовать реальный вызов OpenAI API
-            # Сейчас возвращаем заглушку
-            return {
-                "confidence": 8,
-                "intent_type": "покупка",
-                "reasoning": "Пользователь явно ищет товар и готов к покупке"
-            }
+            # Вызываем реальный OpenAI анализ
+            result = await self.openai_service.analyze_potential_client(
+                message_text=message_text,
+                product_name=product_name,
+                keywords=keywords,
+                matched_keywords=matched_keywords,
+                author_info=author_info,
+                chat_info=chat_info
+            )
+            
+            return result
             
         except Exception as e:
             logger.error(f"Error calling AI analysis: {e}")
-            return {"confidence": 0, "intent_type": "unknown", "reasoning": "Ошибка анализа"}
+            return {
+                "confidence": 0,
+                "intent_type": "unknown", 
+                "reasoning": "Ошибка анализа ИИ",
+                "message_data": {
+                    "text": message_text,
+                    "author": author_info,
+                    "chat": chat_info
+                }
+            }
     
     async def _save_potential_client(
         self, 
         user_id: int, 
         chat_id: str,   
+        chat_name: str,
         message_data: Dict[str, Any], 
         ai_result: Dict[str, Any]
     ):
@@ -464,17 +509,17 @@ class ClientMonitoringService:
             client_data = {
                 'user_id': user_id,
                 'product_template_id': template.get('id'),
-                'template_name': template.get('name'),               # ✅ ДОБАВИТЬ
+                'template_name': template.get('name'),             
                 'message_id': message.get('message_id'),
                 'chat_id': chat_id,
-                'chat_name': None,   # ✅ ИСПРАВИТЬ
+                'chat_name': chat_name,   
                 'author_username': author.get('username'),
-                'author_id': author.get('telegram_id'),                  # ✅ ИСПРАВИТЬ
+                'author_id': author.get('telegram_id'),                 
                 'message_text': message.get('text', '')[:1000],
                 'matched_keywords': message_data['matched_keywords'],
                 'ai_confidence': ai_result.get('confidence', 0),
                 'ai_intent_type': ai_result.get('intent_type', 'unknown'),
-                'ai_explanation_text': ai_result.get('reasoning', ''), # ✅ ДОБАВИТЬ
+                'ai_explanation_text': ai_result.get('reasoning', ''), 
                 'client_status': 'new',
                 'notification_sent': False,
                 'created_at': datetime.now().isoformat()

@@ -981,3 +981,148 @@ class OpenAIService:
                 }
             ]
         }
+    
+    async def analyze_potential_client(
+        self,
+        message_text: str,
+        product_name: str,
+        keywords: List[str],
+        matched_keywords: List[str],
+        author_info: Dict[str, Any],
+        chat_info: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Анализ сообщения на предмет потенциального клиента
+        
+        Args:
+            message_text: Текст сообщения пользователя
+            product_name: Название продукта/услуги
+            keywords: Все ключевые слова шаблона
+            matched_keywords: Найденные ключевые слова в сообщении
+            author_info: Данные автора сообщения
+            chat_info: Данные чата/группы
+            
+        Returns:
+            Результат анализа с confidence, intent_type, reasoning и всеми данными
+        """
+        try:
+            system_prompt = """Ты - эксперт по анализу намерений клиентов в сообщениях.
+    Твоя задача - определить, является ли автор сообщения потенциальным покупателем товара/услуги.
+
+    КРИТЕРИИ ОЦЕНКИ:
+    - 1-3: Низкая вероятность (просто упоминание, информационный запрос без намерения покупки)
+    - 4-6: Средняя вероятность (интерес, сравнение вариантов, изучение рынка)  
+    - 7-8: Высокая вероятность (активный поиск, готовность к покупке, конкретные потребности)
+    - 9-10: Очень высокая вероятность (срочная потребность, готов купить сейчас)
+
+    ТИПЫ НАМЕРЕНИЙ:
+    - "информация" - просто интересуется, изучает
+    - "покупка" - готов купить, ищет где купить
+    - "сравнение" - сравнивает варианты, выбирает
+    - "продажа" - хочет продать (не клиент)
+    - "другое" - реклама, спам, не связано с покупкой
+
+    ОБЯЗАТЕЛЬНО включи в ответ все данные о сообщении, авторе и чате для удобства администратора.
+
+    Отвечай только в формате JSON без дополнительного текста."""
+
+            user_prompt = f"""
+    Проанализируй сообщение пользователя:
+
+    ПРОДУКТ/УСЛУГА: {product_name}
+    КЛЮЧЕВЫЕ СЛОВА: {', '.join(keywords)}
+    НАЙДЕННЫЕ СЛОВА: {', '.join(matched_keywords)}
+
+    АВТОР СООБЩЕНИЯ:
+    - ID: {author_info.get('telegram_id', 'неизвестен')}
+    - Username: @{author_info.get('username', 'неизвестен')}
+    - Имя: {author_info.get('first_name', 'неизвестно')}
+
+    ЧАТ/ГРУППА:
+    - ID: {chat_info.get('chat_id', 'неизвестен')}
+    - Название: {chat_info.get('chat_name', 'неизвестно')}
+
+    СООБЩЕНИЕ:
+    "{message_text}"
+
+    Оцени по шкале от 1 до 10 уверенность в том, что это потенциальный покупатель.
+    Определи тип намерения.
+    Объясни свой анализ.
+
+    Ответь в формате JSON:
+    {{
+        "confidence": число от 1 до 10,
+        "intent_type": "информация/покупка/сравнение/продажа/другое",
+        "reasoning": "подробное объяснение анализа",
+        "message_data": {{
+            "text": "{message_text}",
+            "author": {{
+                "telegram_id": "{author_info.get('telegram_id', '')}",
+                "username": "{author_info.get('username', '')}",
+                "first_name": "{author_info.get('first_name', '')}"
+            }},
+            "chat": {{
+                "chat_id": "{chat_info.get('chat_id', '')}",
+                "chat_name": "{chat_info.get('chat_name', '')}"
+            }}
+        }}
+    }}"""
+
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",  # Быстрая модель для простого анализа
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,  # Низкая температура для более точного анализа
+                max_tokens=400    # Увеличиваем для включения данных
+            )
+            
+            # Парсим JSON ответ
+            result_text = response.choices[0].message.content.strip()
+            
+            # Убираем возможные markdown блоки
+            if result_text.startswith('```json'):
+                result_text = result_text[7:-3]
+            elif result_text.startswith('```'):
+                result_text = result_text[3:-3]
+                
+            result = json.loads(result_text)
+            
+            # Валидация результата
+            if not isinstance(result.get('confidence'), (int, float)):
+                result['confidence'] = 5
+            if result['confidence'] < 1:
+                result['confidence'] = 1
+            elif result['confidence'] > 10:
+                result['confidence'] = 10
+                
+            logger.info(f"AI analysis completed: confidence={result.get('confidence')}, intent={result.get('intent_type')}")
+            return result
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI response as JSON: {e}")
+            return {
+                "confidence": 5,
+                "intent_type": "unknown", 
+                "reasoning": "Ошибка парсинга ответа ИИ",
+                "message_data": {
+                    "text": message_text,
+                    "author": author_info,
+                    "chat": chat_info
+                }
+            }
+        except Exception as e:
+            logger.error(f"Error in AI client analysis: {e}")
+            return {
+                "confidence": 0,
+                "intent_type": "unknown",
+                "reasoning": f"Ошибка анализа: {str(e)}",
+                "message_data": {
+                    "text": message_text,
+                    "author": author_info,
+                    "chat": chat_info
+                }
+            }
+        
+    
