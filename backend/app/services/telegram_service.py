@@ -221,7 +221,9 @@ class TelegramService:
                         'media_type': None,
                         'edit_date': message.edit_date.isoformat() if message.edit_date else None,
                         'views': getattr(message, 'views', None),
-                        'user_info': None
+                        'user_info': None,
+                        'chat_id': str(group_id),  # ID чата
+                        'chat_title': getattr(entity, 'title', f'Chat {group_id}') 
                     }
                     
                     # Информация о медиа

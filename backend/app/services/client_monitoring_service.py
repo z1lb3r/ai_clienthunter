@@ -98,7 +98,7 @@ class ClientMonitoringService:
                 print(f"📝 CLIENT_MONITOR: Template {i+1}: '{template.get('name', 'UNNAMED')}'")
                 print(f"📝 CLIENT_MONITOR: Template {i+1} ID: {template.get('id')}")
                 
-                # ЗДЕСЬ ГЛАВНАЯ ПРОБЛЕМА - keywords могут быть строкой вместо массива
+                # ПРОБЛЕМА keywords могут быть строкой вместо массива - ИСПРАВЛЯЕМ
                 keywords_raw = template.get('keywords', [])
                 print(f"📝 CLIENT_MONITOR: Template {i+1} keywords (RAW): {keywords_raw}")
                 print(f"📝 CLIENT_MONITOR: Template {i+1} keywords TYPE: {type(keywords_raw)}")
@@ -150,6 +150,7 @@ class ClientMonitoringService:
             for chat_index, chat_id in enumerate(monitored_chats):
                 try:
                     print(f"💬 CLIENT_MONITOR: === Processing chat {chat_index+1}/{len(monitored_chats)}: {chat_id} ===")
+                    
                     # Получаем название чата
                     try:
                         chat_info = await self.telegram_service.get_group_info(chat_id)
@@ -159,6 +160,7 @@ class ClientMonitoringService:
                         print(f"⚠️ CLIENT_MONITOR: Could not get chat info: {chat_info_error}")
                         chat_name = f'Chat {chat_id}'  # Fallback название
                         print(f"📋 CLIENT_MONITOR: Using fallback chat name: '{chat_name}'")
+                    
                     # === ЭТАП 4.1: Получение сообщений ===
                     print(f"📥 CLIENT_MONITOR: Getting recent messages from chat {chat_id}...")
                     print(f"📥 CLIENT_MONITOR: Calling _get_recent_messages({chat_id}, {lookback_minutes})")
@@ -228,6 +230,8 @@ class ClientMonitoringService:
                                 except Exception as ai_error:
                                     print(f"❌ CLIENT_MONITOR: AI analysis failed: {ai_error}")
                                     logger.error(f"AI analysis error: {ai_error}")
+                                    # ПРОДОЛЖАЕМ обработку следующих сообщений
+                                    continue  # ← ВАЖНО: НЕ ПРЕРЫВАЕМ ВЕСЬ ПРОЦЕСС
                             else:
                                 print(f"❌ CLIENT_MONITOR: No keywords found in message {message_index+1}")
                         
@@ -240,7 +244,8 @@ class ClientMonitoringService:
                     logger.error(f"Error processing chat {chat_id}: {chat_error}")
                     import traceback
                     print(f"❌ CLIENT_MONITOR: Chat error traceback: {traceback.format_exc()}")
-                    continue
+                    # ПРОДОЛЖАЕМ обработку следующих чатов
+                    continue  # ← ВАЖНО: НЕ ПРЕРЫВАЕМ ВЕСЬ ПРОЦЕСС
             
             # === ФИНАЛЬНАЯ СТАТИСТИКА ===
             print(f"📊 CLIENT_MONITOR: === FINAL STATISTICS ===")
@@ -286,7 +291,8 @@ class ClientMonitoringService:
                 # Первый способ: используем offset_date для точной фильтрации по времени
                 messages = await self.telegram_service.get_group_messages(
                     group_id=chat_id,
-                    offset_date=cutoff_time  # Telegram API вернет только сообщения ПОСЛЕ этого времени
+                    offset_date=cutoff_time,
+                    get_users=True 
                 )
                 print(f"✅ CLIENT_MONITOR: Got {len(messages)} messages using offset_date filter")
                 
@@ -301,7 +307,8 @@ class ClientMonitoringService:
                 
                 all_messages = await self.telegram_service.get_group_messages(
                     group_id=chat_id,
-                    limit=estimated_limit
+                    limit=estimated_limit,
+                    get_users=True 
                 )
                 
                 # Фильтруем по времени
@@ -388,28 +395,8 @@ class ClientMonitoringService:
             
             # Проверяем, не анализировали ли мы уже это сообщение
             if await self._is_message_already_processed(message.get('message_id'), user_id):
+                print(f"🔄 CLIENT_MONITOR: Message {message.get('message_id')} already processed - skipping")
                 return
-            
-            # Создаем промпт для ИИ анализа
-            ai_prompt = f"""
-            Проанализируй сообщение пользователя на предмет намерения купить товар/услугу.
-            
-            Продукт: {template['name']}
-            Ключевые слова: {', '.join(template['keywords'])}
-            Сообщение: "{message.get('text', '')}"
-            Найденные ключевые слова: {', '.join(matched_keywords)}
-            
-            Оцени по шкале от 1 до 10:
-            1. Уверенность в том, что это потенциальный покупатель
-            2. Тип намерения (поиск информации, готовность к покупке, сравнение вариантов)
-            
-            Ответь в формате JSON:
-            {{
-                "confidence": число от 1 до 10,
-                "intent_type": "информация/покупка/сравнение/другое",
-                "reasoning": "объяснение анализа"
-            }}
-            """
             
             # Подготавливаем данные автора
             author_info = message.get('user_info', {}) or {}
@@ -430,18 +417,27 @@ class ClientMonitoringService:
                 chat_info=chat_info
             )
             
+            print(f"🤖 CLIENT_MONITOR: AI analysis result - confidence: {ai_result.get('confidence', 0)}/10")
+            
             # Проверяем минимальную уверенность
             min_confidence = settings.get('min_ai_confidence', 7)
             if ai_result.get('confidence', 0) >= min_confidence:
+                print(f"✅ CLIENT_MONITOR: Confidence {ai_result.get('confidence')} >= {min_confidence} - saving client")
+                
                 # Сохраняем потенциального клиента
                 await self._save_potential_client(user_id, chat_id, chat_name, message_data, ai_result)
                 
                 # Отправляем уведомление
                 notification_account = settings.get('notification_account')
                 await self._send_notification(notification_account, message_data, ai_result)
+            else:
+                print(f"❌ CLIENT_MONITOR: Confidence {ai_result.get('confidence')} < {min_confidence} - not saving")
             
         except Exception as e:
-            logger.error(f"Error analyzing message with AI: {e}")
+            print(f"❌ CLIENT_MONITOR: AI analysis failed for message {message.get('message_id')}: {e}")
+            logger.error(f"AI analysis failed for message {message.get('message_id')}: {e}")
+            # НЕ ПРЕРЫВАЕМ ОБРАБОТКУ - продолжаем с другими сообщениями
+
     
     async def _is_message_already_processed(self, message_id: str, user_id: int) -> bool:
         """Проверить, обрабатывалось ли уже это сообщение"""
@@ -548,20 +544,21 @@ class ClientMonitoringService:
             message = message_data['message']
             template = message_data['template']
             author = message.get('user_info', {}) or {}
-            
+
             # Формируем информацию об авторе
             username = author.get('username')
             first_name = author.get('first_name', 'Имя не указано')
-            author_id = author.get('telegram_id', 'ID неизвестен')
+            author_id = author.get('telegram_id', message.get('sender_id', 'ID неизвестен'))
 
             if username:
                 author_info = f"@{username} ({first_name})"
             else:
                 author_info = f"{first_name} (ID: {author_id})"
 
-            # Формируем ссылку на сообщение
-            chat_id = message.get('chat', {}).get('id') or 'unknown'
+            # Формируем ссылку на сообщение - ИСПРАВЛЕНО!
+            chat_id = message.get('chat_id', 'unknown')
             message_id = message.get('message_id', 'unknown')
+            chat_name = message.get('chat_title', 'Неизвестный чат')
             
             # Убираем -100 из chat_id для ссылки
             if str(chat_id).startswith('-100'):
@@ -577,7 +574,7 @@ class ClientMonitoringService:
     💡 Продукт: {template['name']}
     📱 Сообщение: "{message.get('text', '')[:200]}..."
     👤 Автор: {author_info}
-    💬 Чат: {message.get('chat', {}).get('title', 'Неизвестный чат')}
+    💬 Чат: {chat_name}
     🎯 Ключевые слова: {', '.join(message_data['matched_keywords'])}
     🤖 Уверенность ИИ: {ai_result.get('confidence', 0)}/10
     📊 Тип намерения: {ai_result.get('intent_type', 'unknown')}
