@@ -1,52 +1,103 @@
 // frontend/src/components/Common/Sidebar.tsx
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { BarChart2, MessageSquare, Mail, Phone, Settings } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { 
+  LayoutDashboard, 
+  FileTemplate, 
+  Search, 
+  Users, 
+  Settings,
+  Target,
+  Activity
+} from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
-  const location = useLocation();
-
-  const navigation = [
-    { name: 'Dashboard', href: '/', icon: BarChart2 },
-    { name: 'Telegram', href: '/telegram', icon: MessageSquare },
-    { name: 'Email', href: '/email', icon: Mail },
-    { name: 'Calls', href: '/calls', icon: Phone },
-    { name: 'Settings', href: '/settings', icon: Settings },
+  const menuItems = [
+    {
+      path: '/',
+      icon: LayoutDashboard,
+      label: 'Дашборд',
+      description: 'Найденные клиенты'
+    },
+    {
+      path: '/templates',
+      icon: FileTemplate,
+      label: 'Шаблоны',
+      description: 'Продукты и ключевые слова'
+    },
+    {
+      path: '/monitoring',
+      icon: Search,
+      label: 'Мониторинг',
+      description: 'Настройка поиска'
+    },
+    {
+      path: '/clients',
+      icon: Users,
+      label: 'История',
+      description: 'Архив клиентов'
+    },
+    {
+      path: '/settings',
+      icon: Settings,
+      label: 'Настройки',
+      description: 'Конфигурация'
+    }
   ];
 
   return (
-    <div className="hidden md:flex md:flex-shrink-0">
-      <div className="flex flex-col w-64">
-        <div className="flex flex-col h-0 flex-1 bg-gray-800">
-          <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
-            <div className="flex items-center flex-shrink-0 px-4">
-              <span className="text-white text-xl font-semibold">
-                Multi-Channel Analyzer
-              </span>
+    <div className="w-64 bg-dark-800 shadow-lg border-r border-dark-600">
+      {/* Логотип */}
+      <div className="flex items-center justify-center h-16 px-4 border-b border-dark-600">
+        <div className="flex items-center space-x-2">
+          <Target className="h-8 w-8 text-hunter-600" />
+          <div>
+            <h1 className="text-lg font-bold text-primary">ClientHunter</h1>
+            <p className="text-xs text-muted">AI Lead Generation</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Навигация */}
+      <nav className="mt-8 px-4">
+        <div className="space-y-2">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) =>
+                  `group flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
+                    isActive
+                      ? 'bg-hunter-900 text-hunter-400 border border-hunter-700'
+                      : 'text-secondary hover:text-primary hover:bg-dark-700 border border-transparent'
+                  }`
+                }
+              >
+                <Icon className="mr-3 h-5 w-5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="font-medium">{item.label}</div>
+                  <div className="text-xs text-muted group-hover:text-secondary">
+                    {item.description}
+                  </div>
+                </div>
+              </NavLink>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Статус мониторинга */}
+      <div className="absolute bottom-4 left-4 right-4">
+        <div className="bg-dark-700 rounded-lg p-3 border border-dark-600">
+          <div className="flex items-center space-x-2">
+            <Activity className="h-4 w-4 text-hunter-600" />
+            <div className="flex-1">
+              <div className="text-xs font-medium text-primary">Мониторинг</div>
+              <div className="text-xs text-hunter-400">Активен</div>
             </div>
-            <nav className="mt-5 flex-1 px-2 space-y-1">
-              {navigation.map((item) => {
-                const isActive = location.pathname === item.href;
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={`${
-                      isActive
-                        ? 'bg-gray-900 text-white'
-                        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                    } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
-                  >
-                    <item.icon
-                      className={`${
-                        isActive ? 'text-gray-300' : 'text-gray-400 group-hover:text-gray-300'
-                      } mr-3 flex-shrink-0 h-6 w-6`}
-                    />
-                    {item.name}
-                  </Link>
-                );
-              })}
-            </nav>
+            <div className="w-2 h-2 bg-hunter-600 rounded-full animate-pulse"></div>
           </div>
         </div>
       </div>

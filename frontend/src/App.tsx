@@ -1,13 +1,16 @@
-// frontend/src/App.tsx - ОЧИЩЕННАЯ ВЕРСИЯ
-
+// frontend/src/App.tsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Новые страницы для ClientHunter
 import { DashboardPage } from './pages/DashboardPage';
-import { TelegramMainPage } from './pages/TelegramMainPage';
-import { ModeratorsAnalysisPage } from './pages/ModeratorsAnalysisPage';
-import { TelegramGroupsPage } from './pages/TelegramGroupsPage';
-import { TelegramGroupPage } from './pages/TelegramGroupPage';
+import { TemplatesPage } from './pages/TemplatesPage';
+import { MonitoringPage } from './pages/MonitoringPage';
+import { ClientsHistoryPage } from './pages/ClientsHistoryPage';
+import { SettingsPage } from './pages/SettingsPage';
+
+// Обновленные компоненты
 import { Sidebar } from './components/Common/Sidebar';
 import { Header } from './components/Common/Header';
 
@@ -17,21 +20,17 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <div className="flex h-screen bg-gray-100">
+        <div className="flex h-screen bg-dark-900">
           <Sidebar />
           <div className="flex-1 flex flex-col overflow-hidden">
             <Header />
-            <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100">
+            <main className="flex-1 overflow-x-hidden overflow-y-auto bg-dark-900">
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
-                
-                {/* Telegram роуты */}
-                <Route path="/telegram" element={<TelegramMainPage />} />
-                <Route path="/telegram/analyze/moderators" element={<ModeratorsAnalysisPage />} />
-                <Route path="/telegram/groups" element={<TelegramGroupsPage />} />
-                <Route path="/telegram/groups/:groupId" element={<TelegramGroupPage />} />
-                
-                {/* TODO: Add Email and Calls routes */}
+                <Route path="/templates" element={<TemplatesPage />} />
+                <Route path="/monitoring" element={<MonitoringPage />} />
+                <Route path="/clients" element={<ClientsHistoryPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
               </Routes>
             </main>
           </div>
@@ -41,4 +40,4 @@ function App() {
   );
 }
 
-export default App;
+export default App; 
