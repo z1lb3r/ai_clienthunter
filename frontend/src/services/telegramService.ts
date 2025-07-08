@@ -1,10 +1,11 @@
-// frontend/src/services/telegramService.ts - ОБНОВЛЕННАЯ ВЕРСИЯ
+// frontend/src/services/telegramService.ts - ОЧИЩЕННАЯ ВЕРСИЯ
 
 import { api } from './api';
 import { TelegramGroup, ModeratorMetrics, AnalysisReport } from '../types/telegram';
 
 export const telegramService = {
-  // Группы
+  // ===== ГРУППЫ =====
+  
   async getGroups(): Promise<TelegramGroup[]> {
     const response = await api.get('/telegram/groups');
     return response.data;
@@ -25,31 +26,15 @@ export const telegramService = {
     return response.data;
   },
 
-  // Анализ модераторов
+  // ===== АНАЛИЗ МОДЕРАТОРОВ =====
+  
   async analyzeGroup(groupId: string): Promise<AnalysisReport> {
     const response = await api.post(`/telegram/groups/${groupId}/analyze`);
     return response.data;
   },
 
-  // Анализ настроений сообщества
-  async analyzeCommunity(groupId: string, params: {
-    prompt: string;
-    days_back: number;
-  }): Promise<any> {
-    const response = await api.post(`/telegram/groups/${groupId}/analyze-community`, params);
-    return response.data;
-  },
-
-  // НОВЫЙ МЕТОД: Анализ комментариев к постам
-  async analyzePostsComments(groupId: string, params: {
-    prompt: string;
-    post_links: string[];
-  }): Promise<any> {
-    const response = await api.post(`/telegram/groups/${groupId}/analyze-posts`, params);
-    return response.data;
-  },
-
-  // Модераторы
+  // ===== МОДЕРАТОРЫ =====
+  
   async getModeratorMetrics(moderatorId: string, groupId: string): Promise<ModeratorMetrics[]> {
     const response = await api.get(`/telegram/moderators/${moderatorId}/metrics`, {
       params: { group_id: groupId }
@@ -57,7 +42,8 @@ export const telegramService = {
     return response.data;
   },
 
-  // Аналитика
+  // ===== АНАЛИТИКА =====
+  
   async getGroupAnalytics(groupId: string): Promise<any> {
     const response = await api.get(`/telegram/groups/${groupId}/analytics`);
     return response.data;
