@@ -1,7 +1,8 @@
-// frontend/src/pages/TelegramMainPage.tsx
+// frontend/src/pages/TelegramMainPage.tsx - ОЧИЩЕННАЯ ВЕРСИЯ
+
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Users, MessageSquare, LinkIcon, Settings } from 'lucide-react';
+import { Users, Settings, BarChart3 } from 'lucide-react';
 
 export const TelegramMainPage: React.FC = () => {
   return (
@@ -12,24 +13,24 @@ export const TelegramMainPage: React.FC = () => {
             Анализ Telegram
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Выберите тип анализа для получения детальной информации о коммуникациях в Telegram
+            Инструменты для анализа работы модераторов и управления Telegram группами
           </p>
         </div>
 
-        {/* Основные типы анализа */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        {/* Основные функции */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
           {/* Анализ модераторов */}
           <Link
             to="/telegram/analyze/moderators"
-            className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow duration-300 border border-gray-200 hover:border-indigo-300"
+            className="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-shadow duration-300 border border-gray-200 hover:border-indigo-300"
           >
-            <div className="flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-lg mb-4 mx-auto">
+            <div className="flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-lg mb-6 mx-auto">
               <Users className="h-8 w-8 text-indigo-600" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 text-center mb-3">
+            <h3 className="text-xl font-semibold text-gray-900 text-center mb-4">
               Анализ Модераторов
             </h3>
-            <p className="text-gray-600 text-center mb-4">
+            <p className="text-gray-600 text-center mb-6">
               Оценка эффективности работы модераторов: время ответа, качество общения, решение проблем
             </p>
             <div className="text-center">
@@ -39,93 +40,65 @@ export const TelegramMainPage: React.FC = () => {
             </div>
           </Link>
 
-          {/* Анализ настроений */}
+          {/* Управление группами */}
           <Link
-            to="/telegram/analyze/sentiment"
-            className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow duration-300 border border-gray-200 hover:border-green-300"
+            to="/telegram/groups"
+            className="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-shadow duration-300 border border-gray-200 hover:border-green-300"
           >
-            <div className="flex items-center justify-center w-16 h-16 bg-green-100 rounded-lg mb-4 mx-auto">
-              <MessageSquare className="h-8 w-8 text-green-600" />
+            <div className="flex items-center justify-center w-16 h-16 bg-green-100 rounded-lg mb-6 mx-auto">
+              <Settings className="h-8 w-8 text-green-600" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 text-center mb-3">
-              Настроения Жителей
+            <h3 className="text-xl font-semibold text-gray-900 text-center mb-4">
+              Управление Группами
             </h3>
-            <p className="text-gray-600 text-center mb-4">
-              Анализ настроений жителей ЖКХ: проблемы, жалобы, уровень удовлетворенности, предложения
+            <p className="text-gray-600 text-center mb-6">
+              Просмотр групп, настройка параметров мониторинга и управление подключенными каналами
             </p>
             <div className="text-center">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                Требует выбор группы
+                Всегда доступно
               </span>
             </div>
           </Link>
+        </div>
 
-          {/* Анализ комментариев к постам */}
-          <Link
-            to="/telegram/analyze/posts"
-            className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow duration-300 border border-gray-200 hover:border-purple-300"
-          >
-            <div className="flex items-center justify-center w-16 h-16 bg-purple-100 rounded-lg mb-4 mx-auto">
-              <LinkIcon className="h-8 w-8 text-purple-600" />
+        {/* Информационный блок */}
+        <div className="bg-white rounded-lg shadow-md p-8">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-lg mb-4 mx-auto">
+              <BarChart3 className="h-6 w-6 text-blue-600" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 text-center mb-3">
-              Комментарии к Постам
+            <h3 className="text-xl font-semibold text-gray-900 mb-3">
+              Аналитика Telegram
             </h3>
-            <p className="text-gray-600 text-center mb-4">
-              Анализ реакций и обратной связи на конкретные посты, объявления и сообщения
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Получайте детальную аналитику по работе с Telegram группами и эффективности модерации
             </p>
-            <div className="text-center">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                Без привязки к группе
-              </span>
-            </div>
-          </Link>
-        </div>
-
-        {/* Управление группами */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-lg mr-4">
-                <Settings className="h-6 w-6 text-gray-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Управление Группами
-                </h3>
-                <p className="text-gray-600">
-                  Добавление, настройка и обзор подключенных Telegram групп
-                </p>
-              </div>
-            </div>
-            <Link
-              to="/telegram/groups"
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors"
-            >
-              Управление группами
-            </Link>
           </div>
-        </div>
 
-        {/* Дополнительная информация */}
-        <div className="mt-12 text-center">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h4 className="text-lg font-semibold text-blue-900 mb-3">
-              Как начать работу
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-blue-800">
-              <div>
-                <div className="font-medium mb-2">1. Настройте группы</div>
-                <div>Добавьте Telegram группы, которые хотите анализировать</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-700">
+            <div className="text-center">
+              <div className="bg-indigo-50 rounded-lg p-4 mb-3">
+                <Users className="h-8 w-8 text-indigo-600 mx-auto mb-2" />
+                <div className="font-medium text-indigo-900">Модераторы</div>
               </div>
-              <div>
-                <div className="font-medium mb-2">2. Выберите анализ</div>
-                <div>Определите тип анализа в зависимости от ваших целей</div>
+              <p>Анализ времени ответа, качества обратной связи и решения проблем пользователей</p>
+            </div>
+            
+            <div className="text-center">
+              <div className="bg-green-50 rounded-lg p-4 mb-3">
+                <Settings className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                <div className="font-medium text-green-900">Управление</div>
               </div>
-              <div>
-                <div className="font-medium mb-2">3. Получите результаты</div>
-                <div>Изучите детальные отчеты и рекомендации</div>
+              <p>Централизованное управление группами, настройка параметров и мониторинг активности</p>
+            </div>
+            
+            <div className="text-center">
+              <div className="bg-blue-50 rounded-lg p-4 mb-3">
+                <BarChart3 className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                <div className="font-medium text-blue-900">Аналитика</div>
               </div>
+              <p>Детальные отчеты и метрики по работе с сообществом и эффективности коммуникации</p>
             </div>
           </div>
         </div>

@@ -1,12 +1,11 @@
-// frontend/src/App.tsx
+// frontend/src/App.tsx - ОЧИЩЕННАЯ ВЕРСИЯ
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DashboardPage } from './pages/DashboardPage';
 import { TelegramMainPage } from './pages/TelegramMainPage';
 import { ModeratorsAnalysisPage } from './pages/ModeratorsAnalysisPage';
-import { SentimentAnalysisPage } from './pages/SentimentAnalysisPage';
-import { PostsAnalysisPage } from './pages/PostsAnalysisPage';
 import { TelegramGroupsPage } from './pages/TelegramGroupsPage';
 import { TelegramGroupPage } from './pages/TelegramGroupPage';
 import { Sidebar } from './components/Common/Sidebar';
@@ -29,8 +28,6 @@ function App() {
                 {/* Telegram роуты */}
                 <Route path="/telegram" element={<TelegramMainPage />} />
                 <Route path="/telegram/analyze/moderators" element={<ModeratorsAnalysisPage />} />
-                <Route path="/telegram/analyze/sentiment" element={<SentimentAnalysisPage />} />
-                <Route path="/telegram/analyze/posts" element={<PostsAnalysisPage />} />
                 <Route path="/telegram/groups" element={<TelegramGroupsPage />} />
                 <Route path="/telegram/groups/:groupId" element={<TelegramGroupPage />} />
                 
