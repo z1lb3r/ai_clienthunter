@@ -4,21 +4,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DashboardPage } from './pages/DashboardPage';
 import { Sidebar } from './components/Common/Sidebar';
 
+
 const queryClient = new QueryClient();
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <div className="flex h-screen bg-gray-900">
-          <Sidebar />
-          <div className="flex-1 overflow-hidden">
-            <main className="h-full overflow-y-auto">
-              <Routes>
-                <Route path="/" element={<DashboardPage />} />
-              </Routes>
-            </main>
-          </div>
+        <div className="min-h-screen bg-gray-900">
+          <Routes>
+            <Route path="/" element={<DashboardPage />} />
+          </Routes>
         </div>
       </Router>
     </QueryClientProvider>
