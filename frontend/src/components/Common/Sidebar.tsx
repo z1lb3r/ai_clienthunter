@@ -8,10 +8,16 @@ import {
   Users, 
   Settings,
   Target,
-  Activity
+  Activity,
+  Loader2
 } from 'lucide-react';
+import { useMonitoringSettings } from '../../hooks/useClientHunterApi';
 
 export const Sidebar: React.FC = () => {
+  const { data: monitoringResponse, isLoading } = useMonitoringSettings();
+  const monitoringSettings = monitoringResponse?.data;
+  const isMonitoringActive = monitoringSettings?.is_active || false;
+
   const menuItems = [
     {
       path: '/',
@@ -62,12 +68,20 @@ export const Sidebar: React.FC = () => {
       <div className="absolute bottom-4 left-4 right-4">
         <div className="bg-gray-700 rounded-lg p-3 border border-gray-600">
           <div className="flex items-center space-x-2">
-            <Activity className="h-4 w-4 text-green-500" />
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+            ) : (
+              <Activity className={`h-4 w-4 ${isMonitoringActive ? 'text-green-500' : 'text-red-500'}`} />
+            )}
             <div className="flex-1">
               <div className="text-xs font-medium text-gray-100">Мониторинг</div>
-              <div className="text-xs text-green-400">Активен</div>
+              <div className={`text-xs ${isMonitoringActive ? 'text-green-400' : 'text-red-400'}`}>
+                {isLoading ? 'Загрузка...' : (isMonitoringActive ? 'Активен' : 'Остановлен')}
+              </div>
             </div>
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            {!isLoading && (
+              <div className={`w-2 h-2 rounded-full ${isMonitoringActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+            )}
           </div>
         </div>
       </div>
