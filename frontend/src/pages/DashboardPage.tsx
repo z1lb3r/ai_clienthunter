@@ -271,7 +271,9 @@ export const DashboardPage: React.FC = () => {
                           <div className="flex items-center space-x-4 text-xs text-gray-400">
                             <span>Шаблон: {getTemplateName(client.matched_template_id)}</span>
                             <span>•</span>
-                            <span>Ключевые слова: {client.matched_keywords.join(', ')}</span>
+                            <span>Ключевые слова: {Array.isArray(client.matched_keywords) 
+                              ? client.matched_keywords.join(', ') 
+                              : client.matched_keywords || 'Нет данных'}</span>
                           </div>
                         </div>
                         
