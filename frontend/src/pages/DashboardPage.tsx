@@ -1,5 +1,5 @@
 // frontend/src/pages/DashboardPage.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Target, 
   Plus, 
@@ -22,8 +22,13 @@ import {
   useMonitoringSettings
 } from '../hooks/useClientHunterApi';
 import { PotentialClient, ProductTemplate } from '../types/api';
+import { ProductTemplateModal } from '../components/ProductTemplates/ProductTemplateModal';
 
 export const DashboardPage: React.FC = () => {
+  // Состояние модального окна
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<ProductTemplate | undefined>();
+
   // API хуки
   const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats();
   const { data: clientsResponse, isLoading: clientsLoading, error: clientsError } = usePotentialClients({ limit: 10 });
@@ -37,6 +42,22 @@ export const DashboardPage: React.FC = () => {
   const templates = templatesResponse?.data || [];
   const monitoringSettings = monitoringResponse?.data;
   const isMonitoringActive = monitoringSettings?.is_active || false;
+
+  // Обработчики модального окна
+  const handleCreateTemplate = () => {
+    setEditingTemplate(undefined);
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleEditTemplate = (template: ProductTemplate) => {
+    setEditingTemplate(template);
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsTemplateModalOpen(false);
+    setEditingTemplate(undefined);
+  };
 
   // Вычисляем топ шаблоны на основе реальных данных
   const getTopTemplates = () => {
@@ -82,71 +103,32 @@ export const DashboardPage: React.FC = () => {
     return template?.name || 'Неизвестный шаблон';
   };
 
-  // Функция для форматирования имени клиента
-  const getClientDisplayName = (client: PotentialClient) => {
-    if (client.username) return `@${client.username}`;
-    if (client.first_name || client.last_name) {
-      return `${client.first_name || ''} ${client.last_name || ''}`.trim();
-    }
-    return `User ${client.telegram_user_id}`;
-  };
+  // Компоненты загрузки и ошибок
+  const LoadingSpinner = () => (
+    <div className="flex items-center justify-center py-4">
+      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+    </div>
+  );
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'new': return 'bg-green-500';
-      case 'contacted': return 'bg-blue-500';
-      case 'ignored': return 'bg-gray-500';
-      case 'converted': return 'bg-purple-500';
-      default: return 'bg-gray-500';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'new': return 'Новый';
-      case 'contacted': return 'Связались';
-      case 'ignored': return 'Игнор';
-      case 'converted': return 'Конверсия';
-      default: return 'Неизвестно';
-    }
-  };
-
-  // Форматирование времени
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('ru-RU', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
-
-  // Компонент ошибки
   const ErrorMessage = ({ message }: { message: string }) => (
-    <div className="flex items-center justify-center p-8 text-red-400">
+    <div className="flex items-center justify-center py-4 text-red-400">
       <AlertCircle className="h-5 w-5 mr-2" />
       <span>{message}</span>
     </div>
   );
 
-  // Компонент загрузки
-  const LoadingSpinner = () => (
-    <div className="flex items-center justify-center p-8">
-      <Loader2 className="h-6 w-6 animate-spin text-green-500" />
-    </div>
-  );
-
   return (
-    <div className="h-full bg-gray-900 p-6 overflow-y-auto">
+    <div className="p-6 bg-gray-900 min-h-screen">
       <div className="max-w-7xl mx-auto">
-        
-        {/* Заголовок */}
+        {/* Заголовок и быстрые действия */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-100">Dashboard</h1>
-            <div className="flex items-center mt-1 space-x-2">
-              <p className="text-gray-400">Мониторинг потенциальных клиентов</p>
-              <div className="flex items-center space-x-1">
-                <div className={`w-2 h-2 rounded-full ${isMonitoringActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+            <h1 className="text-2xl font-bold text-gray-100">Панель управления</h1>
+            <div className="flex items-center mt-2 text-sm text-gray-400">
+              <div className="flex items-center space-x-2">
+                <span>Статус мониторинга:</span>
+                <div className={`w-2 h-2 rounded-full ${isMonitoringActive ? 
+                  'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
                 <span className={`text-xs font-medium ${isMonitoringActive ? 'text-green-400' : 'text-red-400'}`}>
                   {isMonitoringActive ? 'Активен' : 'Остановлен'}
                 </span>
@@ -154,7 +136,10 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div className="flex space-x-3">
-            <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+            <button 
+              onClick={handleCreateTemplate}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Добавить шаблон
             </button>
@@ -183,7 +168,9 @@ export const DashboardPage: React.FC = () => {
             <>
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                 <div className="flex items-center">
-                  <Users className="h-8 w-8 text-green-500" />
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <Users className="h-6 w-6 text-green-600" />
+                  </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-400">Сегодня</p>
                     <p className="text-2xl font-bold text-gray-100">{stats.clientsToday}</p>
@@ -193,7 +180,9 @@ export const DashboardPage: React.FC = () => {
 
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                 <div className="flex items-center">
-                  <TrendingUp className="h-8 w-8 text-blue-500" />
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <TrendingUp className="h-6 w-6 text-blue-600" />
+                  </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-400">За неделю</p>
                     <p className="text-2xl font-bold text-gray-100">{stats.clientsWeek}</p>
@@ -203,7 +192,9 @@ export const DashboardPage: React.FC = () => {
 
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                 <div className="flex items-center">
-                  <Target className="h-8 w-8 text-purple-500" />
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Target className="h-6 w-6 text-purple-600" />
+                  </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-400">Всего</p>
                     <p className="text-2xl font-bold text-gray-100">{stats.totalClients}</p>
@@ -213,7 +204,9 @@ export const DashboardPage: React.FC = () => {
 
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                 <div className="flex items-center">
-                  <Star className="h-8 w-8 text-yellow-500" />
+                  <div className="p-2 bg-yellow-100 rounded-lg">
+                    <Star className="h-6 w-6 text-yellow-600" />
+                  </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-400">Конверсия</p>
                     <p className="text-2xl font-bold text-gray-100">{stats.conversionRate}%</p>
@@ -221,16 +214,26 @@ export const DashboardPage: React.FC = () => {
                 </div>
               </div>
             </>
-          ) : null}
+          ) : (
+            <div className="col-span-4">
+              <ErrorMessage message="Нет данных статистики" />
+            </div>
+          )}
         </div>
 
+        {/* Основной контент */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Основная таблица клиентов */}
+          {/* Последние клиенты */}
           <div className="lg:col-span-2">
             <div className="bg-gray-800 border border-gray-700 rounded-lg">
               <div className="px-6 py-4 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-gray-100">Последние клиенты</h2>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-100">Последние клиенты</h3>
+                  <div className="flex items-center space-x-2 text-sm text-gray-400">
+                    <Clock className="h-4 w-4" />
+                    <span>Обновлено только что</span>
+                  </div>
+                </div>
               </div>
               
               {clientsLoading ? (
@@ -238,59 +241,56 @@ export const DashboardPage: React.FC = () => {
               ) : clientsError ? (
                 <ErrorMessage message="Ошибка загрузки клиентов" />
               ) : clients.length === 0 ? (
-                <div className="p-8 text-center text-gray-400">
-                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Клиенты не найдены</p>
-                  <p className="text-sm mt-1">Запустите мониторинг для поиска клиентов</p>
+                <div className="text-center text-gray-400 py-8">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Клиенты пока не найдены</p>
+                  <p className="text-sm mt-1">Настройте мониторинг и добавьте шаблоны</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-700">
                   {clients.map((client) => (
-                    <div key={client.id} className="p-6 hover:bg-gray-750 transition-colors">
+                    <div key={client.id} className="p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
-                            <div className="flex items-center space-x-2">
-                              <div className={`w-2 h-2 rounded-full ${getStatusColor(client.client_status)}`}></div>
-                              <span className="font-medium text-gray-100">
-                                {getClientDisplayName(client)}
-                              </span>
-                            </div>
-                            <span className="text-xs px-2 py-1 bg-green-900 text-green-300 rounded">
-                              {getTemplateName(client.matched_template_id)}
-                            </span>
-                            <span className="text-xs text-gray-400">
-                              {formatTime(client.created_at)}
+                            <h4 className="font-medium text-gray-100">
+                              {client.first_name} {client.last_name}
+                              {client.username && (
+                                <span className="text-green-400 ml-2">@{client.username}</span>
+                              )}
+                            </h4>
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                              {(client.ai_confidence * 100).toFixed(0)}% уверенность
                             </span>
                           </div>
                           
-                          <p className="text-gray-300 text-sm mb-3 line-clamp-2">
-                            {client.message_text}
+                          <p className="text-gray-300 text-sm mb-2">
+                            "{client.message_text}"
                           </p>
                           
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                              <span className="text-xs text-gray-400">
-                                Уверенность: <span className="text-green-400 font-medium">{client.ai_confidence}/10</span>
-                              </span>
-                              
-                              {/* Интерактивное изменение статуса */}
-                              <select 
-                                value={client.client_status}
-                                onChange={(e) => handleStatusChange(client.id, e.target.value as any)}
-                                disabled={updateClientStatusMutation.isPending}
-                                className="text-xs px-2 py-1 bg-gray-700 text-gray-300 rounded border border-gray-600 focus:border-green-500 focus:outline-none"
-                              >
-                                <option value="new">Новый</option>
-                                <option value="contacted">Связались</option>
-                                <option value="ignored">Игнор</option>
-                                <option value="converted">Конверсия</option>
-                              </select>
-                            </div>
-                            <button className="text-gray-400 hover:text-gray-200 transition-colors">
-                              <ExternalLink className="h-4 w-4" />
-                            </button>
+                          <div className="flex items-center space-x-4 text-xs text-gray-400">
+                            <span>Шаблон: {getTemplateName(client.matched_template_id)}</span>
+                            <span>•</span>
+                            <span>Ключевые слова: {client.matched_keywords.join(', ')}</span>
                           </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-3 ml-4">
+                          <div className="flex items-center space-x-2">
+                            <select
+                              value={client.client_status}
+                              onChange={(e) => handleStatusChange(client.id, e.target.value as any)}
+                              className="text-xs px-2 py-1 bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            >
+                              <option value="new">Новый</option>
+                              <option value="contacted">Связались</option>
+                              <option value="ignored">Игнор</option>
+                              <option value="converted">Конверсия</option>
+                            </select>
+                          </div>
+                          <button className="text-gray-400 hover:text-gray-200 transition-colors">
+                            <ExternalLink className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -342,7 +342,10 @@ export const DashboardPage: React.FC = () => {
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-100 mb-4">Быстрые действия</h3>
               <div className="space-y-3">
-                <button className="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                <button 
+                  onClick={handleCreateTemplate}
+                  className="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Новый шаблон
                 </button>
@@ -355,6 +358,13 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Модальное окно для шаблонов */}
+      <ProductTemplateModal
+        isOpen={isTemplateModalOpen}
+        onClose={handleCloseModal}
+        template={editingTemplate}
+      />
     </div>
   );
 };
