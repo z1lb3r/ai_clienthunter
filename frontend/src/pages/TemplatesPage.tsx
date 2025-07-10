@@ -6,11 +6,9 @@ import {
   Edit2, 
   Trash2, 
   Users, 
-  TrendingUp,
   ToggleLeft,
   ToggleRight,
-  Loader2,
-  AlertCircle
+  Loader2
 } from 'lucide-react';
 
 import { 
@@ -49,6 +47,22 @@ export const TemplatesPage: React.FC = () => {
       conversionRate: templateClients.length > 0 ? Math.round((conversions / templateClients.length) * 100) : 0,
       avgConfidence: Math.round(avgConfidence * 100)
     };
+  };
+
+  // Функция для обработки ключевых слов
+  const getKeywords = (keywords: any): string[] => {
+    if (Array.isArray(keywords)) {
+      return keywords;
+    }
+    if (typeof keywords === 'string') {
+      try {
+        const parsed = JSON.parse(keywords);
+        return Array.isArray(parsed) ? parsed : [keywords];
+      } catch {
+        return [keywords];
+      }
+    }
+    return [];
   };
 
   // Обработчики
@@ -164,6 +178,7 @@ export const TemplatesPage: React.FC = () => {
           <div className="space-y-4">
             {templates.map((template) => {
               const stats = getTemplateStats(template.id);
+              const keywords = getKeywords(template.keywords);
               
               return (
                 <div key={template.id} className="bg-gray-800 border border-gray-700 rounded-lg p-6">
@@ -200,14 +215,16 @@ export const TemplatesPage: React.FC = () => {
                       <div className="mb-4">
                         <p className="text-sm text-gray-400 mb-2">Ключевые слова:</p>
                         <div className="flex flex-wrap gap-2">
-                          {template.keywords.map((keyword, index) => (
+                          {keywords.length > 0 ? keywords.map((keyword, index) => (
                             <span
                               key={index}
                               className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
                             >
                               {keyword}
                             </span>
-                          ))}
+                          )) : (
+                            <span className="text-gray-500 text-sm">Нет ключевых слов</span>
+                          )}
                         </div>
                       </div>
 
