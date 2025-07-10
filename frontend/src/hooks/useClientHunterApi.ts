@@ -127,3 +127,26 @@ export const useDashboardStats = () => {
     queryFn: () => clientHunterApi.getDashboardStats(),
   });
 };
+
+// ==================== MONITORING CONTROL ====================
+export const useStartMonitoring = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: () => clientHunterApi.startMonitoring(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.monitoringSettings });
+    },
+  });
+};
+
+export const useStopMonitoring = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: () => clientHunterApi.stopMonitoring(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.monitoringSettings });
+    },
+  });
+};

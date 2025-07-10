@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DashboardPage } from './pages/DashboardPage';
 import { Sidebar } from './components/Common/Sidebar';
 import { TemplatesPage } from './pages/TemplatesPage';
+import { MonitoringPage } from './pages/MonitoringPage';
 
 const queryClient = new QueryClient();
 
@@ -19,6 +20,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/templates" element={<TemplatesPage />} />
+                <Route path="/monitoring" element={<MonitoringPage />} />
               </Routes>
             </main>
           </div>
