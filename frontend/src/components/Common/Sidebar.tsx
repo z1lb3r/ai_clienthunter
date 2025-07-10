@@ -3,7 +3,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
-  FileTemplate, 
+  FileText, 
   Settings,
   Target,
   Activity,
@@ -26,7 +26,7 @@ export const Sidebar: React.FC = () => {
     },
     {
       path: '/templates',
-      icon: FileTemplate,
+      icon:  FileText,
       label: 'Шаблоны',
       description: 'Управление продуктами'
     },
