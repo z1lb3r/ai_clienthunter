@@ -4,12 +4,11 @@ import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   FileTemplate, 
-  Search, 
-  Users, 
   Settings,
   Target,
   Activity,
-  Loader2
+  Loader2,
+  Monitor
 } from 'lucide-react';
 import { useMonitoringSettings } from '../../hooks/useClientHunterApi';
 
@@ -24,6 +23,18 @@ export const Sidebar: React.FC = () => {
       icon: LayoutDashboard,
       label: 'Дашборд',
       description: 'Найденные клиенты'
+    },
+    {
+      path: '/templates',
+      icon: FileTemplate,
+      label: 'Шаблоны',
+      description: 'Управление продуктами'
+    },
+    {
+      path: '/monitoring',
+      icon: Monitor,
+      label: 'Мониторинг',
+      description: 'Настройки поиска'
     }
   ];
 
@@ -49,7 +60,13 @@ export const Sidebar: React.FC = () => {
               <NavLink
                 key={item.path}
                 to={item.path}
-                className="group flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 bg-gray-700 text-gray-100 border border-gray-600"
+                className={({ isActive }) => `
+                  group flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200
+                  ${isActive 
+                    ? 'bg-green-600 text-white border border-green-500 shadow-lg' 
+                    : 'bg-gray-700 text-gray-100 border border-gray-600 hover:bg-gray-600 hover:border-gray-500'
+                  }
+                `}
               >
                 <Icon className="mr-3 h-5 w-5 flex-shrink-0" />
                 <div className="flex-1">
