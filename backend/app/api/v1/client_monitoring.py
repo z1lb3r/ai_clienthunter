@@ -16,18 +16,22 @@ router = APIRouter()
 class ProductTemplateCreate(BaseModel):
     name: str
     keywords: List[str]
+    monitored_chats: Optional[List[str]] = []
+    check_interval_minutes: Optional[int] = 5
+    lookback_minutes: Optional[int] = 60
+    min_ai_confidence: Optional[int] = 7
 
 class ProductTemplateUpdate(BaseModel):
     name: Optional[str] = None
     keywords: Optional[List[str]] = None
+    monitored_chats: Optional[List[str]] = None
+    check_interval_minutes: Optional[int] = None
+    lookback_minutes: Optional[int] = None
+    min_ai_confidence: Optional[int] = None
     is_active: Optional[bool] = None
 
 class MonitoringSettingsUpdate(BaseModel):
-    monitored_chats: Optional[List[str]] = None
     notification_account: Optional[str] = None
-    check_interval_minutes: Optional[int] = 5
-    lookback_minutes: Optional[int] = 5
-    min_ai_confidence: Optional[int] = 7
     is_active: Optional[bool] = None
 
 class ClientStatusUpdate(BaseModel):
@@ -46,11 +50,15 @@ async def create_product_template(template: ProductTemplateCreate, user_id: int 
         if not template.keywords:
             raise HTTPException(status_code=400, detail="Keywords list cannot be empty")
         
-        # Создаем запись
+        # Создаем запись с новыми полями
         result = supabase_client.table('product_templates').insert({
             'user_id': user_id,
             'name': template.name,
             'keywords': template.keywords,
+            'monitored_chats': template.monitored_chats,
+            'check_interval_minutes': template.check_interval_minutes,
+            'lookback_minutes': template.lookback_minutes,
+            'min_ai_confidence': template.min_ai_confidence,
             'is_active': True,
             'created_at': datetime.now().isoformat(),
             'updated_at': datetime.now().isoformat()
@@ -93,6 +101,14 @@ async def update_product_template(template_id: int, template: ProductTemplateUpd
             if not template.keywords:
                 raise HTTPException(status_code=400, detail="Keywords list cannot be empty")
             update_data['keywords'] = template.keywords
+        if template.monitored_chats is not None:
+            update_data['monitored_chats'] = template.monitored_chats
+        if template.check_interval_minutes is not None:
+            update_data['check_interval_minutes'] = template.check_interval_minutes
+        if template.lookback_minutes is not None:
+            update_data['lookback_minutes'] = template.lookback_minutes
+        if template.min_ai_confidence is not None:
+            update_data['min_ai_confidence'] = template.min_ai_confidence
         if template.is_active is not None:
             update_data['is_active'] = template.is_active
         

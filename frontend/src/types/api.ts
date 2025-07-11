@@ -4,6 +4,10 @@ export interface ProductTemplate {
   user_id: number;
   name: string;
   keywords: string[];
+  monitored_chats: string[];  // НОВОЕ ПОЛЕ
+  check_interval_minutes: number;  // НОВОЕ ПОЛЕ
+  lookback_minutes: number;  // НОВОЕ ПОЛЕ
+  min_ai_confidence: number;  // НОВОЕ ПОЛЕ
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -12,33 +16,35 @@ export interface ProductTemplate {
 export interface ProductTemplateCreate {
   name: string;
   keywords: string[];
+  monitored_chats?: string[];  // НОВОЕ ПОЛЕ
+  check_interval_minutes?: number;  // НОВОЕ ПОЛЕ
+  lookback_minutes?: number;  // НОВОЕ ПОЛЕ
+  min_ai_confidence?: number;  // НОВОЕ ПОЛЕ
 }
 
 export interface ProductTemplateUpdate {
   name?: string;
   keywords?: string[];
+  monitored_chats?: string[];  // НОВОЕ ПОЛЕ
+  check_interval_minutes?: number;  // НОВОЕ ПОЛЕ
+  lookback_minutes?: number;  // НОВОЕ ПОЛЕ
+  min_ai_confidence?: number;  // НОВОЕ ПОЛЕ
   is_active?: boolean;
 }
 
+// MonitoringSettings теперь только для глобальных настроек
 export interface MonitoringSettings {
   id: number;
   user_id: number;
-  monitored_chats: string[];
   notification_account: string;
-  check_interval_minutes: number;
-  lookback_minutes: number;
-  min_ai_confidence: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  last_monitoring_check?: string;
 }
 
 export interface MonitoringSettingsUpdate {
-  monitored_chats?: string[];
   notification_account?: string;
-  check_interval_minutes?: number;
-  lookback_minutes?: number;
-  min_ai_confidence?: number;
   is_active?: boolean;
 }
 
