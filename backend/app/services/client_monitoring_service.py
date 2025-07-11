@@ -636,16 +636,52 @@ class ClientMonitoringService:
                         continue
                     
                     # Поиск ключевых слов в сообщениях
-                    for message in messages:
-                        message_text = message.get('text', '').lower()
+                  # Поиск ключевых слов в сообщениях
+                    print(f"🔍 CLIENT_MONITOR: Analyzing {len(messages)} messages for keywords: {keywords}")
+                    for msg_index, message in enumerate(messages):
+                        message_text = message.get('text', '')
+                        
+                        if not message_text:
+                            continue
+                            
+                        print(f"🔎 CLIENT_MONITOR: Checking message {msg_index+1}: '{message_text[:100]}...'")
                         
                         # Проверяем наличие ключевых слов
                         matched_keywords = []
                         for keyword in keywords:
-                            if keyword.lower() in message_text:
+                            if keyword.lower() in message_text.lower():
                                 matched_keywords.append(keyword)
                         
                         if matched_keywords:
+                            print(f"🎯 CLIENT_MONITOR: FOUND KEYWORDS {matched_keywords} in message!")
+                            
+                            # Подготавливаем данные для ИИ анализа
+                            message_data = {
+                                'message': message,
+                                'template': template,
+                                'matched_keywords': matched_keywords
+                            }
+                            
+                            # Подготавливаем настройки для ИИ
+                            analysis_settings = {
+                                'notification_account': settings.get('notification_account', ''),
+                                'min_ai_confidence': min_ai_confidence
+                            }
+                            
+                            # Анализ через ИИ
+                            print(f"🤖 CLIENT_MONITOR: Calling AI analysis...")
+                            await self._analyze_message_with_ai(
+                                user_id, 
+                                chat_id, 
+                                message.get('chat_title', f'Chat {chat_id}'),
+                                message_data, 
+                                analysis_settings
+                            )
+                        else:
+                            print(f"❌ CLIENT_MONITOR: No keywords found in message {msg_index+1}")
+                            
+
+
                             print(f"🎯 CLIENT_MONITOR: Found keywords {matched_keywords} in message from chat {chat_id}")
                             
                             # Подготавливаем данные для ИИ анализа
