@@ -252,18 +252,17 @@ async def update_monitoring_settings(settings: MonitoringSettingsUpdate, user_id
         raise HTTPException(status_code=500, detail=str(e))
     
 
+
 @router.post("/monitoring/start")
 async def start_monitoring(user_id: int = 1):
     """Запустить мониторинг для пользователя"""
     try:
-        # Включаем мониторинг в настройках
+        # ИСПРАВЛЕНО: Только включаем глобальный мониторинг
+        # Планировщик автоматически подхватит изменения
         await update_monitoring_settings(MonitoringSettingsUpdate(is_active=True), user_id)
         
-        # Запускаем сервис мониторинга
-        await monitoring_service.start_monitoring(user_id)
-        
-        logger.info(f"Started monitoring for user {user_id}")
-        return {"status": "success", "message": "Monitoring started"}
+        logger.info(f"Started global monitoring for user {user_id}")
+        return {"status": "success", "message": "Global monitoring enabled - scheduler will handle templates"}
         
     except Exception as e:
         logger.error(f"Error starting monitoring: {str(e)}")
@@ -273,19 +272,16 @@ async def start_monitoring(user_id: int = 1):
 async def stop_monitoring(user_id: int = 1):
     """Остановить мониторинг для пользователя"""
     try:
-        # Выключаем мониторинг в настройках
+        # ИСПРАВЛЕНО: Только выключаем глобальный мониторинг
         await update_monitoring_settings(MonitoringSettingsUpdate(is_active=False), user_id)
         
-        # Останавливаем сервис мониторинга
-        await monitoring_service.stop_monitoring(user_id)
-        
-        logger.info(f"Stopped monitoring for user {user_id}")
-        return {"status": "success", "message": "Monitoring stopped"}
+        logger.info(f"Stopped global monitoring for user {user_id}")
+        return {"status": "success", "message": "Global monitoring disabled"}
         
     except Exception as e:
         logger.error(f"Error stopping monitoring: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
+    
 # ==================== POTENTIAL CLIENTS ====================
 
 @router.get("/potential-clients")
