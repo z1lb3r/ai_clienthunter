@@ -603,7 +603,7 @@ class ClientMonitoringService:
         try:
             template_name = template.get('name', f'Template {template.get("id")}')
             template_id = template.get('id')
-            chat_ids = settings.get('chat_ids', [])
+            chat_ids = template.get('chat_ids', [])
             keywords = template.get('keywords', [])
             
             print(f"🔎 CLIENT_MONITOR: Starting search for template '{template_name}' (ID: {template_id})")
@@ -624,7 +624,9 @@ class ClientMonitoringService:
                     print(f"💬 CLIENT_MONITOR: Processing chat {chat_id} for template '{template_name}'")
                     
                     # Получаем сообщения за последние N минут
-                    lookback_minutes = settings.get('lookback_minutes', 60)
+                    lookback_minutes = template.get('lookback_minutes', 60)
+                    min_ai_confidence = template.get('min_ai_confidence', 7)
+                    print(f"🔎 CLIENT_MONITOR: Template settings - lookback: {lookback_minutes}min, confidence: {min_ai_confidence}")
                     messages = await self._get_recent_messages(chat_id, lookback_minutes)
                     
                     print(f"📥 CLIENT_MONITOR: Got {len(messages)} messages from chat {chat_id}")
