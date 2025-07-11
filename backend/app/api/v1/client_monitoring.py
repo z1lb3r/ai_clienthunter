@@ -179,7 +179,7 @@ async def update_product_template(template_id: int, template: ProductTemplateUpd
         logger.error(f"Error updating product template: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     
-    
+
 @router.delete("/product-templates/{template_id}")
 async def delete_product_template(template_id: int, user_id: int = 1):
     """Удалить шаблон продукта"""
@@ -207,14 +207,10 @@ async def get_monitoring_settings(user_id: int = 1):
         if result.data:
             return {"status": "success", "data": result.data[0]}
         else:
-            # Создаем настройки по умолчанию, если их нет
+            # ИСПРАВЛЕНО: Создаем настройки только с глобальными полями
             default_settings = {
                 'user_id': user_id,
-                'monitored_chats': [],
                 'notification_account': '',
-                'check_interval_minutes': 5,
-                'lookback_minutes': 5,
-                'min_ai_confidence': 7,
                 'is_active': False,
                 'created_at': datetime.now().isoformat(),
                 'updated_at': datetime.now().isoformat()
@@ -236,16 +232,9 @@ async def update_monitoring_settings(settings: MonitoringSettingsUpdate, user_id
             'updated_at': datetime.now().isoformat()
         }
         
-        if settings.monitored_chats is not None:
-            update_data['monitored_chats'] = settings.monitored_chats
+        # УБРАЛИ старые поля - теперь только глобальные настройки
         if settings.notification_account is not None:
             update_data['notification_account'] = settings.notification_account
-        if settings.check_interval_minutes is not None:
-            update_data['check_interval_minutes'] = settings.check_interval_minutes
-        if settings.lookback_minutes is not None:
-            update_data['lookback_minutes'] = settings.lookback_minutes
-        if settings.min_ai_confidence is not None:
-            update_data['min_ai_confidence'] = settings.min_ai_confidence
         if settings.is_active is not None:
             update_data['is_active'] = settings.is_active
         
@@ -261,6 +250,7 @@ async def update_monitoring_settings(settings: MonitoringSettingsUpdate, user_id
     except Exception as e:
         logger.error(f"Error updating monitoring settings: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+    
 
 @router.post("/monitoring/start")
 async def start_monitoring(user_id: int = 1):
