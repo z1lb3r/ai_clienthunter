@@ -7,6 +7,7 @@ import logging
 
 from ...core.database import supabase_client
 from ...services.client_monitoring_service import ClientMonitoringService
+from ...services.telegram_service import telegram_service
 
 logger = logging.getLogger(__name__)
 
@@ -44,18 +45,36 @@ monitoring_service = ClientMonitoringService()
 
 @router.post("/product-templates")
 async def create_product_template(template: ProductTemplateCreate, user_id: int = 1):
-    """Создать новый шаблон продукта"""
+    """Создать новый шаблон продукта с конвертацией ссылок"""
     try:
         # Валидация
         if not template.keywords:
             raise HTTPException(status_code=400, detail="Keywords list cannot be empty")
         
-        # Создаем запись с новыми полями
+        # === НОВОЕ: Конвертация ссылок в chat_ids ===
+        chat_ids = []
+        conversion_errors = []
+        
+        if template.monitored_chats:
+            logger.info(f"Converting {len(template.monitored_chats)} chat links to IDs...")
+            
+            conversion_results = await telegram_service.resolve_multiple_chat_links(template.monitored_chats)
+            
+            for link, chat_id in conversion_results.items():
+                if chat_id:
+                    chat_ids.append(chat_id)
+                    logger.info(f"✅ Converted {link} -> {chat_id}")
+                else:
+                    conversion_errors.append(link)
+                    logger.warning(f"❌ Failed to convert {link}")
+        
+        # Создаем запись с обеими версиями данных
         result = supabase_client.table('product_templates').insert({
             'user_id': user_id,
             'name': template.name,
             'keywords': template.keywords,
-            'monitored_chats': template.monitored_chats,
+            'monitored_chats': template.monitored_chats,  # Оригинальные ссылки
+            'chat_ids': chat_ids,  # Конвертированные ID
             'check_interval_minutes': template.check_interval_minutes,
             'lookback_minutes': template.lookback_minutes,
             'min_ai_confidence': template.min_ai_confidence,
@@ -65,8 +84,17 @@ async def create_product_template(template: ProductTemplateCreate, user_id: int 
         }).execute()
         
         if result.data:
-            logger.info(f"Created product template: {template.name}")
-            return {"status": "success", "data": result.data[0]}
+            response_data = result.data[0]
+            
+            # Добавляем информацию о конвертации в ответ
+            if conversion_errors:
+                response_data['conversion_warnings'] = {
+                    'failed_links': conversion_errors,
+                    'message': f'Не удалось найти {len(conversion_errors)} чат(ов). Проверьте ссылки.'
+                }
+            
+            logger.info(f"Created product template: {template.name} with {len(chat_ids)} converted chats")
+            return {"status": "success", "data": response_data}
         else:
             raise HTTPException(status_code=400, detail="Failed to create template")
             
@@ -88,21 +116,39 @@ async def get_product_templates(user_id: int = 1):
 
 @router.put("/product-templates/{template_id}")
 async def update_product_template(template_id: int, template: ProductTemplateUpdate, user_id: int = 1):
-    """Обновить шаблон продукта"""
+    """Обновить шаблон продукта с конвертацией ссылок"""
     try:
         # Подготавливаем данные для обновления
         update_data = {
             'updated_at': datetime.now().isoformat()
         }
         
+        conversion_errors = []
+        
+        # Если обновляются чаты - конвертируем их
+        if template.monitored_chats is not None:
+            logger.info(f"Converting {len(template.monitored_chats)} chat links for update...")
+            
+            chat_ids = []
+            if template.monitored_chats:
+                conversion_results = await telegram_service.resolve_multiple_chat_links(template.monitored_chats)
+                
+                for link, chat_id in conversion_results.items():
+                    if chat_id:
+                        chat_ids.append(chat_id)
+                    else:
+                        conversion_errors.append(link)
+            
+            update_data['monitored_chats'] = template.monitored_chats
+            update_data['chat_ids'] = chat_ids
+        
+        # Остальные поля
         if template.name is not None:
             update_data['name'] = template.name
         if template.keywords is not None:
             if not template.keywords:
                 raise HTTPException(status_code=400, detail="Keywords list cannot be empty")
             update_data['keywords'] = template.keywords
-        if template.monitored_chats is not None:
-            update_data['monitored_chats'] = template.monitored_chats
         if template.check_interval_minutes is not None:
             update_data['check_interval_minutes'] = template.check_interval_minutes
         if template.lookback_minutes is not None:
@@ -112,18 +158,28 @@ async def update_product_template(template_id: int, template: ProductTemplateUpd
         if template.is_active is not None:
             update_data['is_active'] = template.is_active
         
+        # Выполняем обновление
         result = supabase_client.table('product_templates').update(update_data).eq('id', template_id).eq('user_id', user_id).execute()
         
         if result.data:
+            response_data = result.data[0]
+            
+            if conversion_errors:
+                response_data['conversion_warnings'] = {
+                    'failed_links': conversion_errors,
+                    'message': f'Не удалось найти {len(conversion_errors)} чат(ов). Проверьте ссылки.'
+                }
+            
             logger.info(f"Updated product template {template_id}")
-            return {"status": "success", "data": result.data[0]}
+            return {"status": "success", "data": response_data}
         else:
             raise HTTPException(status_code=404, detail="Template not found")
             
     except Exception as e:
         logger.error(f"Error updating product template: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
+    
+    
 @router.delete("/product-templates/{template_id}")
 async def delete_product_template(template_id: int, user_id: int = 1):
     """Удалить шаблон продукта"""

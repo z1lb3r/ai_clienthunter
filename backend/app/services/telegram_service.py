@@ -354,10 +354,99 @@ class TelegramService:
         except Exception as e:
             logger.error(f"❌ Failed to send message to {username}: {e}")
             return False
+        
+    async def resolve_chat_link(self, chat_link: str) -> Optional[str]:
+        """
+        Конвертировать ссылку t.me в chat_id
+        
+        Args:
+            chat_link: Ссылка вида https://t.me/username или @username
+            
+        Returns:
+            chat_id как строка или None если не удалось найти
+        """
+        try:
+            await self.ensure_connected()
+            
+            # Очищаем ссылку до username
+            username = self._extract_username_from_link(chat_link)
+            if not username:
+                logger.error(f"Cannot extract username from link: {chat_link}")
+                return None
+                
+            logger.info(f"Resolving username: {username}")
+            
+            # Получаем entity через Telethon
+            entity = await self.client.get_entity(username)
+            
+            # Получаем chat_id
+            chat_id = str(entity.id)
+            if hasattr(entity, 'migrated_to') and entity.migrated_to:
+                # Если канал мигрировал в супергруппу
+                chat_id = str(entity.migrated_to.channel_id)
+                
+            logger.info(f"✅ Resolved {username} -> {chat_id}")
+            return chat_id
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to resolve chat link {chat_link}: {e}")
+            return None
+
+    def _extract_username_from_link(self, chat_link: str) -> Optional[str]:
+        """Извлечь username из различных форматов ссылок"""
+        try:
+            # Убираем пробелы
+            link = chat_link.strip()
+            
+            # Если уже username без ссылки
+            if link.startswith('@'):
+                return link[1:]  # убираем @
+                
+            # Если полная ссылка https://t.me/username
+            if 't.me/' in link:
+                parts = link.split('t.me/')
+                if len(parts) > 1:
+                    username = parts[1].strip('/')
+                    # Убираем дополнительные параметры после ?
+                    if '?' in username:
+                        username = username.split('?')[0]
+                    return username
+                    
+            # Если просто username без @
+            if link and not link.startswith('http'):
+                return link
+                
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error extracting username from {chat_link}: {e}")
+            return None
+
+    async def resolve_multiple_chat_links(self, chat_links: List[str]) -> Dict[str, Optional[str]]:
+        """
+        Конвертировать несколько ссылок одновременно
+        
+        Returns:
+            Словарь {ссылка: chat_id или None}
+        """
+        results = {}
+        
+        for link in chat_links:
+            chat_id = await self.resolve_chat_link(link)
+            results[link] = chat_id
+            
+            # Небольшая пауза между запросами чтобы не нарваться на лимиты
+            await asyncio.sleep(0.5)
+            
+        return results
     
     def generate_session_string(self) -> str:
         """Получить строку сессии"""
         return self.client.session.save()
+    
 
 # Глобальный экземпляр сервиса
 telegram_service = TelegramService()
+
+
+    
