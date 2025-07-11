@@ -67,17 +67,22 @@ class TelegramService:
     async def ensure_connected(self):
         """Обеспечить подключение к Telegram"""
         try:
-            if not await self.is_connected():
-                logger.info("🔄 Reconnecting to Telegram...")
+            if not self.client.is_connected():
+                print("🔌 TELEGRAM: Connecting to Telegram...")
                 await self.client.connect()
+                print("✅ TELEGRAM: Connected to Telegram")
+            
+            # ИСПРАВЛЯЕМ: Добавляем await
+            if not await self.client.is_user_authorized():
+                print("❌ TELEGRAM: User not authorized! Need to login first")
+                logger.error("Telegram user not authorized. Run authorization script first.")
+                raise Exception("Telegram user not authorized. Please run authorization first.")
+            else:
+                print("✅ TELEGRAM: User is authorized")
                 
-                if not self.client.is_user_authorized():
-                    logger.error("❌ Telegram client not authorized")
-                    raise Exception("Telegram client not authorized. Please check session string.")
-                
-                logger.info("✅ Telegram client reconnected")
         except Exception as e:
-            logger.error(f"❌ Failed to ensure connection: {e}")
+            logger.error(f"Error ensuring Telegram connection: {e}")
+            print(f"❌ TELEGRAM: Connection error: {e}")
             raise
     
     async def health_check(self) -> Dict[str, Any]:
@@ -431,15 +436,20 @@ class TelegramService:
         """
         results = {}
         
+        print(f"🔗 RESOLVING {len(chat_links)} chat links:")
+        for i, link in enumerate(chat_links):
+            print(f"  {i+1}. '{link}'")
+        
         for link in chat_links:
             chat_id = await self.resolve_chat_link(link)
             results[link] = chat_id
+            print(f"🔗 RESULT: '{link}' -> {chat_id}")
             
             # Небольшая пауза между запросами чтобы не нарваться на лимиты
             await asyncio.sleep(0.5)
-            
+        
         return results
-    
+        
     def generate_session_string(self) -> str:
         """Получить строку сессии"""
         return self.client.session.save()

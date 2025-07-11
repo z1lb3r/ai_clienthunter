@@ -110,16 +110,18 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
 
   // Добавление чата
   const addChat = () => {
-    const chat = currentChat.trim();
-    
-    if (chat && !formData.monitored_chats.includes(chat)) {
-      setFormData(prev => ({
-        ...prev,
-        monitored_chats: [...prev.monitored_chats, chat]
-      }));
-      setCurrentChat('');
-    }
-  };
+  const chat = currentChat.trim();
+  
+  // ИСПРАВЛЯЕМ: Проверяем что чат не пустой и не дублируется
+  if (chat && !formData.monitored_chats.includes(chat)) {
+    console.log('Adding chat:', chat); // Для отладки
+    setFormData(prev => ({
+      ...prev,
+      monitored_chats: [...prev.monitored_chats, chat]
+    }));
+    setCurrentChat('');
+  }
+};
 
   // Удаление чата
   const removeChat = (index: number) => {

@@ -196,7 +196,7 @@ class SchedulerService:
         """Проверить, нужно ли запускать мониторинг для пользователя"""
         try:
             last_check = settings.get('last_monitoring_check')
-            interval_minutes = settings.get('check_interval_minutes', 5)
+            interval_minutes = 5
             
             print(f"⏰ SCHEDULER: Checking interval - last_check: {last_check}, interval: {interval_minutes}min")
             logger.info(f"⏰ SCHEDULER: Checking interval - last_check: {last_check}, interval: {interval_minutes}min")

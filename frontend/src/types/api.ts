@@ -5,6 +5,7 @@ export interface ProductTemplate {
   name: string;
   keywords: string[];
   monitored_chats: string[];  // НОВОЕ ПОЛЕ
+  chat_ids: string[];
   check_interval_minutes: number;  // НОВОЕ ПОЛЕ
   lookback_minutes: number;  // НОВОЕ ПОЛЕ
   min_ai_confidence: number;  // НОВОЕ ПОЛЕ
