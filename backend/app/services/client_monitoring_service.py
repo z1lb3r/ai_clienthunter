@@ -618,26 +618,27 @@ class ClientMonitoringService:
                 print(f"❌ CLIENT_MONITOR: No keywords for template '{template_name}'")
                 return
             
+            # Настройки мониторинга из template
+            lookback_minutes = template.get('lookback_minutes', 60)
+            min_ai_confidence = template.get('min_ai_confidence', 7)
+            print(f"🔎 CLIENT_MONITOR: Template settings - lookback: {lookback_minutes}min, confidence: {min_ai_confidence}")
+            
             # Обрабатываем каждый чат
             for chat_id in chat_ids:
                 try:
                     print(f"💬 CLIENT_MONITOR: Processing chat {chat_id} for template '{template_name}'")
                     
                     # Получаем сообщения за последние N минут
-                    lookback_minutes = template.get('lookback_minutes', 60)
-                    min_ai_confidence = template.get('min_ai_confidence', 7)
-                    print(f"🔎 CLIENT_MONITOR: Template settings - lookback: {lookback_minutes}min, confidence: {min_ai_confidence}")
                     messages = await self._get_recent_messages(chat_id, lookback_minutes)
-                    
                     print(f"📥 CLIENT_MONITOR: Got {len(messages)} messages from chat {chat_id}")
                     
                     if not messages:
                         print(f"📥 CLIENT_MONITOR: No recent messages in chat {chat_id}")
                         continue
                     
-                    # Поиск ключевых слов в сообщениях
-                  # Поиск ключевых слов в сообщениях
+                    # Анализируем сообщения на ключевые слова
                     print(f"🔍 CLIENT_MONITOR: Analyzing {len(messages)} messages for keywords: {keywords}")
+                    
                     for msg_index, message in enumerate(messages):
                         message_text = message.get('text', '')
                         
@@ -652,6 +653,7 @@ class ClientMonitoringService:
                             if keyword.lower() in message_text.lower():
                                 matched_keywords.append(keyword)
                         
+                        # ИСПРАВЛЕНО: ИИ анализ ТОЛЬКО при найденных ключевых словах
                         if matched_keywords:
                             print(f"🎯 CLIENT_MONITOR: FOUND KEYWORDS {matched_keywords} in message!")
                             
@@ -679,26 +681,6 @@ class ClientMonitoringService:
                             )
                         else:
                             print(f"❌ CLIENT_MONITOR: No keywords found in message {msg_index+1}")
-                            
-
-
-                            print(f"🎯 CLIENT_MONITOR: Found keywords {matched_keywords} in message from chat {chat_id}")
-                            
-                            # Подготавливаем данные для ИИ анализа
-                            message_data = {
-                                'message': message,
-                                'template': template,
-                                'matched_keywords': matched_keywords
-                            }
-                            
-                            # Анализ через ИИ
-                            await self._analyze_message_with_ai(
-                                user_id, 
-                                chat_id, 
-                                message.get('chat_title', f'Chat {chat_id}'),
-                                message_data, 
-                                settings
-                            )
                     
                 except Exception as e:
                     print(f"❌ CLIENT_MONITOR: Error processing chat {chat_id}: {e}")
