@@ -596,3 +596,81 @@ class ClientMonitoringService:
                 
         except Exception as e:
             logger.error(f"Error sending notification: {e}")
+
+
+    async def _search_and_analyze_template(self, user_id: int, template: Dict[str, Any], settings: Dict[str, Any]):
+        """Поиск и анализ для конкретного шаблона"""
+        try:
+            template_name = template.get('name', f'Template {template.get("id")}')
+            template_id = template.get('id')
+            chat_ids = settings.get('chat_ids', [])
+            keywords = template.get('keywords', [])
+            
+            print(f"🔎 CLIENT_MONITOR: Starting search for template '{template_name}' (ID: {template_id})")
+            print(f"🔎 CLIENT_MONITOR: Chat IDs: {chat_ids}")
+            print(f"🔎 CLIENT_MONITOR: Keywords: {keywords}")
+            
+            if not chat_ids:
+                print(f"❌ CLIENT_MONITOR: No chat_ids for template '{template_name}'")
+                return
+                
+            if not keywords:
+                print(f"❌ CLIENT_MONITOR: No keywords for template '{template_name}'")
+                return
+            
+            # Обрабатываем каждый чат
+            for chat_id in chat_ids:
+                try:
+                    print(f"💬 CLIENT_MONITOR: Processing chat {chat_id} for template '{template_name}'")
+                    
+                    # Получаем сообщения за последние N минут
+                    lookback_minutes = settings.get('lookback_minutes', 60)
+                    messages = await self._get_recent_messages(chat_id, lookback_minutes)
+                    
+                    print(f"📥 CLIENT_MONITOR: Got {len(messages)} messages from chat {chat_id}")
+                    
+                    if not messages:
+                        print(f"📥 CLIENT_MONITOR: No recent messages in chat {chat_id}")
+                        continue
+                    
+                    # Поиск ключевых слов в сообщениях
+                    for message in messages:
+                        message_text = message.get('text', '').lower()
+                        
+                        # Проверяем наличие ключевых слов
+                        matched_keywords = []
+                        for keyword in keywords:
+                            if keyword.lower() in message_text:
+                                matched_keywords.append(keyword)
+                        
+                        if matched_keywords:
+                            print(f"🎯 CLIENT_MONITOR: Found keywords {matched_keywords} in message from chat {chat_id}")
+                            
+                            # Подготавливаем данные для ИИ анализа
+                            message_data = {
+                                'message': message,
+                                'template': template,
+                                'matched_keywords': matched_keywords
+                            }
+                            
+                            # Анализ через ИИ
+                            await self._analyze_message_with_ai(
+                                user_id, 
+                                chat_id, 
+                                message.get('chat_title', f'Chat {chat_id}'),
+                                message_data, 
+                                settings
+                            )
+                    
+                except Exception as e:
+                    print(f"❌ CLIENT_MONITOR: Error processing chat {chat_id}: {e}")
+                    logger.error(f"Error processing chat {chat_id}: {e}")
+                    continue
+            
+            print(f"✅ CLIENT_MONITOR: Completed processing template '{template_name}'")
+            
+        except Exception as e:
+            print(f"❌ CLIENT_MONITOR: Error in _search_and_analyze_template: {e}")
+            logger.error(f"Error in _search_and_analyze_template: {e}")
+            import traceback
+            print(f"❌ CLIENT_MONITOR: Traceback: {traceback.format_exc()}")

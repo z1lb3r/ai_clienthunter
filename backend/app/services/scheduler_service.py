@@ -169,27 +169,55 @@ class SchedulerService:
             logger.error(f"❌ SCHEDULER: Traceback: {traceback.format_exc()}")
     
     async def _get_active_monitoring_users(self) -> list:
-        """Получить всех пользователей с активным мониторингом"""
+        """Получить всех пользователей с активными шаблонами"""
         try:
-            print("📊 SCHEDULER: Querying database for active monitoring users")
-            logger.info("📊 SCHEDULER: Querying database for active monitoring users")
-            result = supabase_client.table('monitoring_settings').select('*').eq('is_active', True).execute()
+            print("📊 SCHEDULER: Querying database for users with active templates")
+            logger.info("📊 SCHEDULER: Querying database for users with active templates")
             
-            users = result.data or []
-            print(f"📊 SCHEDULER: Database returned {len(users)} active monitoring users")
-            logger.info(f"📊 SCHEDULER: Retrieved {len(users)} active monitoring users from database")
+            # НОВАЯ ЛОГИКА: Читаем активные product_templates вместо monitoring_settings
+            result = supabase_client.table('product_templates').select('user_id').eq('is_active', True).execute()
             
-            for user in users:
-                chats_count = len(user.get('monitored_chats', []))
-                interval = user.get('check_interval_minutes', 'N/A')
-                print(f"👤 SCHEDULER: User {user['user_id']} - chats: {chats_count}, interval: {interval}min")
-                logger.info(f"👤 SCHEDULER: User {user['user_id']} - chats: {chats_count}, interval: {interval}min")
+            if not result.data:
+                print("📊 SCHEDULER: No active templates found")
+                logger.info("📊 SCHEDULER: No active templates found")
+                return []
+                
+            # Получаем уникальные user_id с активными шаблонами
+            unique_user_ids = list(set([template['user_id'] for template in result.data]))
+            
+            print(f"📊 SCHEDULER: Found {len(unique_user_ids)} users with active templates")
+            logger.info(f"📊 SCHEDULER: Found {len(unique_user_ids)} users with active templates")
+            
+            # Формируем список пользователей для мониторинга
+            users = []
+            for user_id in unique_user_ids:
+                # Получаем глобальные настройки пользователя
+                settings_result = supabase_client.table('monitoring_settings').select('*').eq('user_id', user_id).execute()
+                
+                if settings_result.data:
+                    settings = settings_result.data[0]
+                    # Проверяем что глобальный мониторинг включен
+                    if settings.get('is_active', False):
+                        users.append({
+                            'user_id': user_id,
+                            'notification_account': settings.get('notification_account', ''),
+                            'is_active': True,
+                            'last_monitoring_check': settings.get('last_monitoring_check')
+                        })
+                        print(f"👤 SCHEDULER: User {user_id} - global monitoring ACTIVE")
+                    else:
+                        print(f"👤 SCHEDULER: User {user_id} - global monitoring DISABLED")
+                else:
+                    print(f"👤 SCHEDULER: User {user_id} - no global settings found")
+            
+            print(f"📊 SCHEDULER: Database returned {len(users)} users with active monitoring")
+            logger.info(f"📊 SCHEDULER: Retrieved {len(users)} users with active monitoring")
             
             return users
-            
+        
         except Exception as e:
-            print(f"❌ SCHEDULER: Error getting active monitoring users: {e}")
-            logger.error(f"❌ SCHEDULER: Error getting active monitoring users: {e}")
+            print(f"❌ SCHEDULER: Error getting users with active templates: {e}")
+            logger.error(f"❌ SCHEDULER: Error getting users with active templates: {e}")
             return []
     
     def _should_run_monitoring(self, settings: dict) -> bool:
@@ -261,7 +289,7 @@ class SchedulerService:
             # Обновляем время последней проверки в начале
             await self._update_last_check_time(user_id)
             
-            # Получаем шаблоны продуктов
+            # НОВАЯ ЛОГИКА: Получаем активные шаблоны пользователя
             templates = await self._get_user_templates(user_id)
             if not templates:
                 print(f"❌ SCHEDULER: No active product templates found for user {user_id}")
@@ -271,20 +299,31 @@ class SchedulerService:
             print(f"📝 SCHEDULER: Found {len(templates)} active templates for user {user_id}")
             logger.info(f"📝 SCHEDULER: Found {len(templates)} active templates for user {user_id}")
             
-            # Получаем чаты для мониторинга
-            monitored_chats = settings.get('monitored_chats', [])
-            if not monitored_chats:
-                print(f"❌ SCHEDULER: No monitored chats configured for user {user_id}")
-                logger.warning(f"❌ SCHEDULER: No monitored chats configured for user {user_id}")
-                return
-            
-            print(f"💬 SCHEDULER: Monitoring {len(monitored_chats)} chats for user {user_id}")
-            logger.info(f"💬 SCHEDULER: Monitoring {len(monitored_chats)} chats for user {user_id}")
-            
-            # Запускаем поиск и анализ
-            print(f"🔎 SCHEDULER: Calling _search_and_analyze for user {user_id}")
-            await self.monitoring_service._search_and_analyze(user_id, settings)
-            print(f"✅ SCHEDULER: _search_and_analyze completed for user {user_id}")
+            # НОВАЯ ЛОГИКА: Обрабатываем каждый шаблон отдельно
+            for template in templates:
+                template_name = template.get('name', f'Template {template.get("id")}')
+                chat_ids = template.get('chat_ids', [])
+                
+                if not chat_ids:
+                    print(f"⚠️ SCHEDULER: Template '{template_name}' has no chat_ids - skipping")
+                    continue
+                    
+                print(f"📝 SCHEDULER: Processing template '{template_name}' with {len(chat_ids)} chats")
+                
+                # Подготавливаем настройки для этого шаблона
+                template_settings = {
+                    'notification_account': settings.get('notification_account', ''),
+                    'chat_ids': chat_ids,  # ВАЖНО: используем chat_ids
+                    'check_interval_minutes': template.get('check_interval_minutes', 5),
+                    'lookback_minutes': template.get('lookback_minutes', 60),
+                    'min_ai_confidence': template.get('min_ai_confidence', 7),
+                    'is_active': True
+                }
+                
+                # Запускаем поиск и анализ для этого шаблона
+                print(f"🔎 SCHEDULER: Calling _search_and_analyze for template '{template_name}'")
+                await self.monitoring_service._search_and_analyze_template(user_id, template, template_settings)
+                print(f"✅ SCHEDULER: _search_and_analyze completed for template '{template_name}'")
             
             logger.info(f"✅ SCHEDULER: Monitoring execution completed for user {user_id}")
             
@@ -293,7 +332,7 @@ class SchedulerService:
             logger.error(f"❌ SCHEDULER: Error running monitoring for user {user_id}: {e}")
             import traceback
             logger.error(f"❌ SCHEDULER: Traceback: {traceback.format_exc()}")
-    
+        
     async def _update_last_check_time(self, user_id: int):
         """Обновить время последней проверки"""
         try:
