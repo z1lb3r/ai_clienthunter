@@ -1,6 +1,6 @@
 // frontend/src/components/ProductTemplates/ProductTemplateModal.tsx
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Tag, Loader2 } from 'lucide-react';
+import { Plus, X, Tag, Loader2, MessageSquare, Clock, Target } from 'lucide-react';
 import { Modal } from '../Common/Modal';
 import { 
   useCreateProductTemplate, 
@@ -11,7 +11,7 @@ import { ProductTemplate } from '../../types/api';
 interface ProductTemplateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  template?: ProductTemplate; // Для редактирования
+  template?: ProductTemplate;
 }
 
 export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
@@ -21,9 +21,14 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     name: '',
-    keywords: [] as string[]
+    keywords: [] as string[],
+    monitored_chats: [] as string[],
+    check_interval_minutes: 5,
+    lookback_minutes: 60,
+    min_ai_confidence: 7
   });
   const [currentKeyword, setCurrentKeyword] = useState('');
+  const [currentChat, setCurrentChat] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const createMutation = useCreateProductTemplate();
@@ -38,15 +43,24 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
       if (template) {
         setFormData({
           name: template.name,
-          keywords: [...template.keywords]
+          keywords: [...template.keywords],
+          monitored_chats: [...(template.monitored_chats || [])],
+          check_interval_minutes: template.check_interval_minutes || 5,
+          lookback_minutes: template.lookback_minutes || 60,
+          min_ai_confidence: template.min_ai_confidence || 7
         });
       } else {
         setFormData({
           name: '',
-          keywords: []
+          keywords: [],
+          monitored_chats: [],
+          check_interval_minutes: 5,
+          lookback_minutes: 60,
+          min_ai_confidence: 7
         });
       }
       setCurrentKeyword('');
+      setCurrentChat('');
       setErrors({});
     }
   }, [isOpen, template]);
@@ -80,7 +94,6 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
       }));
       setCurrentKeyword('');
       
-      // Очистка ошибки
       if (errors.keywords) {
         setErrors(prev => ({ ...prev, keywords: '' }));
       }
@@ -95,11 +108,39 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
     }));
   };
 
-  // Обработка Enter в поле ключевого слова
+  // Добавление чата
+  const addChat = () => {
+    const chat = currentChat.trim();
+    
+    if (chat && !formData.monitored_chats.includes(chat)) {
+      setFormData(prev => ({
+        ...prev,
+        monitored_chats: [...prev.monitored_chats, chat]
+      }));
+      setCurrentChat('');
+    }
+  };
+
+  // Удаление чата
+  const removeChat = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      monitored_chats: prev.monitored_chats.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Обработка Enter
   const handleKeywordKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       addKeyword();
+    }
+  };
+
+  const handleChatKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addChat();
     }
   };
 
@@ -115,13 +156,21 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
           id: template.id,
           template: {
             name: formData.name.trim(),
-            keywords: formData.keywords
+            keywords: formData.keywords,
+            monitored_chats: formData.monitored_chats,
+            check_interval_minutes: formData.check_interval_minutes,
+            lookback_minutes: formData.lookback_minutes,
+            min_ai_confidence: formData.min_ai_confidence
           }
         });
       } else {
         await createMutation.mutateAsync({
           name: formData.name.trim(),
-          keywords: formData.keywords
+          keywords: formData.keywords,
+          monitored_chats: formData.monitored_chats,
+          check_interval_minutes: formData.check_interval_minutes,
+          lookback_minutes: formData.lookback_minutes,
+          min_ai_confidence: formData.min_ai_confidence
         });
       }
       
@@ -142,7 +191,7 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
       isOpen={isOpen}
       onClose={handleClose}
       title={isEditing ? 'Редактировать шаблон' : 'Создать новый шаблон'}
-      size="md"
+      size="lg"
     >
       <form onSubmit={handleSubmit} className="p-6">
         {/* Название шаблона */}
@@ -176,7 +225,6 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
             Ключевые слова
           </label>
           
-          {/* Добавление нового ключевого слова */}
           <div className="flex gap-2 mb-3">
             <input
               type="text"
@@ -197,7 +245,6 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
             </button>
           </div>
 
-          {/* Список ключевых слов */}
           {formData.keywords.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
               {formData.keywords.map((keyword, index) => (
@@ -223,10 +270,108 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
           {errors.keywords && (
             <p className="text-sm text-red-400">{errors.keywords}</p>
           )}
+        </div>
+
+        {/* Мониторинг чатов */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Telegram чаты для мониторинга
+          </label>
           
-          <p className="text-xs text-gray-400 mt-1">
-            Система будет искать сообщения, содержащие эти ключевые слова
-          </p>
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={currentChat}
+              onChange={(e) => setCurrentChat(e.target.value)}
+              onKeyPress={handleChatKeyPress}
+              className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              placeholder="@канал или ссылка на чат"
+              disabled={isLoading}
+            />
+            <button
+              type="button"
+              onClick={addChat}
+              disabled={!currentChat.trim() || isLoading}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+
+          {formData.monitored_chats.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {formData.monitored_chats.map((chat, index) => (
+                <div key={index} className="flex items-center justify-between bg-gray-700 p-3 rounded-md">
+                  <span className="text-gray-200 flex items-center">
+                    <MessageSquare className="h-4 w-4 mr-2 text-green-500" />
+                    {chat}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeChat(index)}
+                    disabled={isLoading}
+                    className="text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Настройки мониторинга */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-4">
+            Параметры поиска
+          </label>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">
+                Интервал проверки (мин)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="60"
+                value={formData.check_interval_minutes}
+                onChange={(e) => setFormData(prev => ({ ...prev, check_interval_minutes: parseInt(e.target.value) || 5 }))}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                disabled={isLoading}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">
+                Глубина поиска (мин)
+              </label>
+              <input
+                type="number"
+                min="5"
+                max="1440"
+                value={formData.lookback_minutes}
+                onChange={(e) => setFormData(prev => ({ ...prev, lookback_minutes: parseInt(e.target.value) || 60 }))}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                disabled={isLoading}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">
+                Порог ИИ (1-10)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={formData.min_ai_confidence}
+                onChange={(e) => setFormData(prev => ({ ...prev, min_ai_confidence: parseInt(e.target.value) || 7 }))}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                disabled={isLoading}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Кнопки */}
