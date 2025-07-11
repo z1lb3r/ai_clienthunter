@@ -385,10 +385,24 @@ class TelegramService:
             entity = await self.client.get_entity(username)
             
             # Получаем chat_id
-            chat_id = str(entity.id)
+            if isinstance(entity, Channel):
+            # Для каналов и супергрупп нужен отрицательный ID с префиксом -100
+                chat_id = f"-100{entity.id}"
+            elif isinstance(entity, Chat):
+                # Для обычных групп просто отрицательный ID
+                chat_id = f"-{entity.id}"
+            else:
+                # Для пользователей оставляем как есть
+                chat_id = str(entity.id)
+
+            # Обработка миграции
             if hasattr(entity, 'migrated_to') and entity.migrated_to:
                 # Если канал мигрировал в супергруппу
-                chat_id = str(entity.migrated_to.channel_id)
+                chat_id = f"-100{entity.migrated_to.channel_id}"
+
+            print(f"🔗 RESOLVE: Entity type: {type(entity).__name__}, Raw ID: {entity.id}, Chat ID: {chat_id}")
+
+
                 
             logger.info(f"✅ Resolved {username} -> {chat_id}")
             return chat_id
