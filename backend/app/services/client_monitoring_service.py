@@ -409,12 +409,13 @@ class ClientMonitoringService:
 
             # Вызываем реальный ИИ анализ с полными данными
             ai_result = await self._call_ai_analysis(
-                message_text=message.get('text', ''),
-                product_name=template['name'],
+                message_text=message_text,
+                product_name=template['name'], 
                 keywords=template['keywords'],
                 matched_keywords=matched_keywords,
                 author_info=author_info,
-                chat_info=chat_info
+                chat_info=chat_info,
+                template=template  # Добавляем template как параметр
             )
             
             print(f"🤖 CLIENT_MONITOR: AI analysis result - confidence: {ai_result.get('confidence', 0)}/10")

@@ -21,6 +21,7 @@ class ProductTemplateCreate(BaseModel):
     check_interval_minutes: Optional[int] = 5
     lookback_minutes: Optional[int] = 60
     min_ai_confidence: Optional[int] = 7
+    ai_prompt: str
 
 class ProductTemplateUpdate(BaseModel):
     name: Optional[str] = None
@@ -29,6 +30,7 @@ class ProductTemplateUpdate(BaseModel):
     check_interval_minutes: Optional[int] = None
     lookback_minutes: Optional[int] = None
     min_ai_confidence: Optional[int] = None
+    ai_prompt: Optional[str] = None
     is_active: Optional[bool] = None
 
 class MonitoringSettingsUpdate(BaseModel):
@@ -50,6 +52,9 @@ async def create_product_template(template: ProductTemplateCreate, user_id: int 
         # Валидация
         if not template.keywords:
             raise HTTPException(status_code=400, detail="Keywords list cannot be empty")
+        
+        if not template.ai_prompt.strip():
+            raise HTTPException(status_code=400, detail="AI prompt cannot be empty")
         
         # === НОВОЕ: Конвертация ссылок в chat_ids ===
         chat_ids = []
@@ -78,6 +83,7 @@ async def create_product_template(template: ProductTemplateCreate, user_id: int 
             'check_interval_minutes': template.check_interval_minutes,
             'lookback_minutes': template.lookback_minutes,
             'min_ai_confidence': template.min_ai_confidence,
+            'ai_prompt': template.ai_prompt,
             'is_active': True,
             'created_at': datetime.now().isoformat(),
             'updated_at': datetime.now().isoformat()
@@ -155,6 +161,10 @@ async def update_product_template(template_id: int, template: ProductTemplateUpd
             update_data['lookback_minutes'] = template.lookback_minutes
         if template.min_ai_confidence is not None:
             update_data['min_ai_confidence'] = template.min_ai_confidence
+        if template.ai_prompt is not None:
+            if not template.ai_prompt.strip():
+                raise HTTPException(status_code=400, detail="AI prompt cannot be empty")
+            update_data['ai_prompt'] = template.ai_prompt
         if template.is_active is not None:
             update_data['is_active'] = template.is_active
         
