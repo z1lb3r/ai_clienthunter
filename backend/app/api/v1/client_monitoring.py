@@ -32,7 +32,7 @@ class ProductTemplateUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 class MonitoringSettingsUpdate(BaseModel):
-    notification_account: Optional[str] = None
+    notification_account: Optional[List[str]] = None
     is_active: Optional[bool] = None
 
 class ClientStatusUpdate(BaseModel):
@@ -222,6 +222,7 @@ async def get_monitoring_settings(user_id: int = 1):
     except Exception as e:
         logger.error(f"Error fetching monitoring settings: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+    
 
 @router.put("/monitoring/settings")
 async def update_monitoring_settings(settings: MonitoringSettingsUpdate, user_id: int = 1):
@@ -232,9 +233,30 @@ async def update_monitoring_settings(settings: MonitoringSettingsUpdate, user_id
             'updated_at': datetime.now().isoformat()
         }
         
-        # УБРАЛИ старые поля - теперь только глобальные настройки
+        # Обрабатываем notification_account как массив
         if settings.notification_account is not None:
-            update_data['notification_account'] = settings.notification_account
+            # Валидируем usernames
+            validated_usernames = []
+            for username in settings.notification_account:
+                if not username.strip():
+                    continue  # Пропускаем пустые строки
+                
+                # Приводим к формату @username
+                clean_username = username.strip()
+                if not clean_username.startswith('@'):
+                    clean_username = '@' + clean_username
+                
+                # Валидируем формат username
+                if not clean_username.replace('@', '').replace('_', '').isalnum():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Invalid username format: {username}"
+                    )
+                
+                validated_usernames.append(clean_username)
+            
+            update_data['notification_account'] = validated_usernames
+        
         if settings.is_active is not None:
             update_data['is_active'] = settings.is_active
         

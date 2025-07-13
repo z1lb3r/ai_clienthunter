@@ -37,7 +37,7 @@ export interface ProductTemplateUpdate {
 export interface MonitoringSettings {
   id: number;
   user_id: number;
-  notification_account: string;
+  notification_account: string[];
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -45,7 +45,7 @@ export interface MonitoringSettings {
 }
 
 export interface MonitoringSettingsUpdate {
-  notification_account?: string;
+  notification_account?: string[];
   is_active?: boolean;
 }
 

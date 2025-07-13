@@ -531,14 +531,14 @@ class ClientMonitoringService:
     
     async def _send_notification(
         self, 
-        notification_account: Optional[str], 
+        notification_accounts: Optional[List[str]], 
         message_data: Dict[str, Any], 
         ai_result: Dict[str, Any]
     ):
         """Отправить уведомление о найденном клиенте"""
         try:
-            if not notification_account:
-                logger.info("No notification account configured")
+            if not notification_accounts or len(notification_accounts) == 0:
+                logger.info("No notification accounts configured")
                 return
             
             message = message_data['message']
@@ -584,16 +584,25 @@ class ClientMonitoringService:
 
     👆 Переходи в чат и предлагай свой товар!"""
 
-            # Отправляем через Telegram API
-            try:
-                success = await self.telegram_service.send_private_message(notification_account, notification_text)
-                if success:
-                    logger.info(f"✅ Notification sent to {notification_account}")
-                else:
-                    logger.error(f"❌ Failed to send notification to {notification_account}")
-            except Exception as e:
-                logger.error(f"❌ Error sending Telegram notification: {e}")
-                
+            # Отправляем всем пользователям из списка
+            successful_sends = 0
+            failed_sends = 0
+            
+            for notification_account in notification_accounts:
+                try:
+                    success = await self.telegram_service.send_private_message(notification_account, notification_text)
+                    if success:
+                        logger.info(f"✅ Notification sent to {notification_account}")
+                        successful_sends += 1
+                    else:
+                        logger.error(f"❌ Failed to send notification to {notification_account}")
+                        failed_sends += 1
+                except Exception as e:
+                    logger.error(f"❌ Error sending Telegram notification to {notification_account}: {e}")
+                    failed_sends += 1
+            
+            logger.info(f"📊 Notification summary: {successful_sends} successful, {failed_sends} failed")
+                    
         except Exception as e:
             logger.error(f"Error sending notification: {e}")
 

@@ -12,7 +12,9 @@ import {
   X,
   Save,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  User,
+  Users
 } from 'lucide-react';
 
 import { 
@@ -33,13 +35,14 @@ export const MonitoringPage: React.FC = () => {
   // Состояние формы
   const [formData, setFormData] = useState({
     monitored_chats: [] as string[],
-    notification_account: '',
+    notification_account: [] as string[],
     check_interval_minutes: 5,
     lookback_minutes: 60,
     min_ai_confidence: 7
   });
   
   const [newChatUrl, setNewChatUrl] = useState('');
+  const [newNotificationUser, setNewNotificationUser] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -51,7 +54,7 @@ export const MonitoringPage: React.FC = () => {
     if (currentSettings) {
       setFormData({
         monitored_chats: currentSettings.monitored_chats || [],
-        notification_account: currentSettings.notification_account || '',
+        notification_account: currentSettings.notification_account || [],
         check_interval_minutes: currentSettings.check_interval_minutes || 5,
         lookback_minutes: currentSettings.lookback_minutes || 60,
         min_ai_confidence: currentSettings.min_ai_confidence || 7
@@ -59,322 +62,324 @@ export const MonitoringPage: React.FC = () => {
     }
   }, [currentSettings]);
 
-  // Обработчики
+  // Функции для управления чатами
+  const validateChatUrl = (url: string): boolean => {
+    const telegramUrlPattern = /^(https?:\/\/)?(t\.me\/|telegram\.me\/)([a-zA-Z0-9_]+)\/?$/;
+    const usernamePattern = /^@?[a-zA-Z0-9_]+$/;
+    return telegramUrlPattern.test(url) || usernamePattern.test(url);
+  };
+
+  const addChat = () => {
+    const trimmedUrl = newChatUrl.trim();
+    if (!trimmedUrl) return;
+    
+    if (!validateChatUrl(trimmedUrl)) {
+      setErrors(prev => ({ 
+        ...prev, 
+        chat_url: 'Неверный формат ссылки. Используйте https://t.me/username или @username' 
+      }));
+      return;
+    }
+    
+    if (formData.monitored_chats.includes(trimmedUrl)) {
+      setErrors(prev => ({ 
+        ...prev, 
+        chat_url: 'Этот чат уже добавлен' 
+      }));
+      return;
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      monitored_chats: [...prev.monitored_chats, trimmedUrl]
+    }));
+    setNewChatUrl('');
+    setHasChanges(true);
+    
+    // Убираем ошибку
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.chat_url;
+      return newErrors;
+    });
+  };
+
+  const removeChat = (chatUrl: string) => {
+    setFormData(prev => ({
+      ...prev,
+      monitored_chats: prev.monitored_chats.filter(chat => chat !== chatUrl)
+    }));
+    setHasChanges(true);
+  };
+
+  // Функции для управления пользователями уведомлений
+  const addNotificationUser = () => {
+    const trimmedUser = newNotificationUser.trim();
+    if (!trimmedUser) return;
+    
+    // Проверяем формат username
+    let cleanUsername = trimmedUser;
+    if (!cleanUsername.startsWith('@')) {
+      cleanUsername = '@' + cleanUsername;
+    }
+    
+    // Валидация
+    const usernamePattern = /^@[a-zA-Z0-9_]+$/;
+    if (!usernamePattern.test(cleanUsername)) {
+      setErrors(prev => ({
+        ...prev,
+        notification_user: 'Неверный формат username. Используйте только буквы, цифры и _'
+      }));
+      return;
+    }
+    
+    // Проверяем дубликаты
+    if (formData.notification_account.includes(cleanUsername)) {
+      setErrors(prev => ({
+        ...prev,
+        notification_user: 'Этот пользователь уже добавлен'
+      }));
+      return;
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      notification_account: [...prev.notification_account, cleanUsername]
+    }));
+    setNewNotificationUser('');
+    setHasChanges(true);
+    
+    // Убираем ошибку
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.notification_user;
+      return newErrors;
+    });
+  };
+
+  const removeNotificationUser = (username: string) => {
+    setFormData(prev => ({
+      ...prev,
+      notification_account: prev.notification_account.filter(user => user !== username)
+    }));
+    setHasChanges(true);
+  };
+
+  // Обработчики изменения полей
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
-    setErrors(prev => ({ ...prev, [field]: '' }));
   };
 
-  const handleAddChat = () => {
-    if (!newChatUrl.trim()) {
-      setErrors(prev => ({ ...prev, newChat: 'Введите URL чата' }));
-      return;
+  // Обработчики для кнопок мониторинга
+  const handleStartMonitoring = async () => {
+    try {
+      await startMonitoringMutation.mutateAsync();
+    } catch (error) {
+      console.error('Error starting monitoring:', error);
     }
+  };
 
-    if (formData.monitored_chats.includes(newChatUrl.trim())) {
-      setErrors(prev => ({ ...prev, newChat: 'Этот чат уже добавлен' }));
-      return;
+  const handleStopMonitoring = async () => {
+    try {
+      await stopMonitoringMutation.mutateAsync();
+    } catch (error) {
+      console.error('Error stopping monitoring:', error);
     }
-
-    handleInputChange('monitored_chats', [...formData.monitored_chats, newChatUrl.trim()]);
-    setNewChatUrl('');
-    setErrors(prev => ({ ...prev, newChat: '' }));
   };
 
-  const handleRemoveChat = (index: number) => {
-    const newChats = formData.monitored_chats.filter((_, i) => i !== index);
-    handleInputChange('monitored_chats', newChats);
-  };
-
+  // Сохранение настроек
   const handleSaveSettings = async () => {
     try {
-      const updateData: MonitoringSettingsUpdate = {
-        monitored_chats: formData.monitored_chats,
-        notification_account: formData.notification_account,
-        check_interval_minutes: formData.check_interval_minutes,
-        lookback_minutes: formData.lookback_minutes,
-        min_ai_confidence: formData.min_ai_confidence
-      };
-
+      const updateData: MonitoringSettingsUpdate = {};
+      
+      // Только измененные поля
+      if (currentSettings?.notification_account !== formData.notification_account) {
+        updateData.notification_account = formData.notification_account;
+      }
+      
       await updateSettingsMutation.mutateAsync(updateData);
       setHasChanges(false);
     } catch (error) {
-      console.error('Failed to save settings:', error);
-    }
-  };
-
-  const handleToggleMonitoring = async () => {
-    try {
-      if (isMonitoringActive) {
-        await stopMonitoringMutation.mutateAsync();
-      } else {
-        await startMonitoringMutation.mutateAsync();
-      }
-    } catch (error) {
-      console.error('Failed to toggle monitoring:', error);
+      console.error('Error saving settings:', error);
     }
   };
 
   if (settingsLoading) {
     return (
-      <div className="p-6 bg-gray-900 min-h-screen">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-          </div>
-        </div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-green-500" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 bg-gray-900 min-h-screen">
-      <div className="max-w-4xl mx-auto">
-        {/* Заголовок */}
-        <div className="flex items-center justify-between mb-8">
+    <div className="space-y-6">
+      {/* Заголовок страницы */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <Monitor className="w-8 h-8 text-green-500" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-100">Настройки мониторинга</h1>
-            <p className="text-gray-400 mt-1">
-              Настройте параметры автоматического поиска клиентов в Telegram
-            </p>
+            <h1 className="text-2xl font-bold text-white">Мониторинг клиентов</h1>
+            <p className="text-gray-400">Управление настройками поиска потенциальных клиентов</p>
+          </div>
+        </div>
+        
+        {/* Кнопка включения/выключения мониторинга */}
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-400">Мониторинг</span>
+            <div className={`w-3 h-3 rounded-full ${isMonitoringActive ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className={`text-sm font-medium ${isMonitoringActive ? 'text-green-400' : 'text-red-400'}`}>
+              {isMonitoringActive ? 'Активен' : 'Остановлен'}
+            </span>
           </div>
           
-          <div className="flex items-center space-x-4">
-            {/* Статус мониторинга */}
-            <div className="flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${isMonitoringActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-              <span className={`text-sm font-medium ${isMonitoringActive ? 'text-green-400' : 'text-red-400'}`}>
-                {isMonitoringActive ? 'Активен' : 'Остановлен'}
-              </span>
-            </div>
-
-            {/* Кнопка запуска/остановки */}
+          {isMonitoringActive ? (
             <button
-              onClick={handleToggleMonitoring}
-              disabled={startMonitoringMutation.isPending || stopMonitoringMutation.isPending}
-              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
-                isMonitoringActive
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
+              onClick={handleStopMonitoring}
+              disabled={stopMonitoringMutation.isPending}
+              className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
             >
-              {startMonitoringMutation.isPending || stopMonitoringMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : isMonitoringActive ? (
-                <Pause className="h-4 w-4 mr-2" />
-              ) : (
-                <Play className="h-4 w-4 mr-2" />
-              )}
-              {isMonitoringActive ? 'Остановить' : 'Запустить'}
+              <Pause className="w-4 h-4" />
+              <span>Остановить</span>
             </button>
+          ) : (
+            <button
+              onClick={handleStartMonitoring}
+              disabled={startMonitoringMutation.isPending}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
+            >
+              <Play className="w-4 h-4" />
+              <span>Запустить</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Основные настройки */}
+      <div className="bg-gray-800 rounded-lg p-6">
+        <div className="flex items-center space-x-3 mb-6">
+          <Settings className="w-6 h-6 text-green-500" />
+          <h2 className="text-xl font-semibold text-white">Настройки уведомлений</h2>
+        </div>
+
+        <div className="space-y-6">
+          {/* Пользователи для уведомлений */}
+          <div>
+            <label className="flex items-center space-x-2 text-sm font-medium text-gray-300 mb-3">
+              <Users className="w-4 h-4" />
+              <span>Пользователи для уведомлений</span>
+            </label>
+            
+            {/* Список текущих пользователей */}
+            {formData.notification_account.length > 0 && (
+              <div className="mb-4 space-y-2">
+                {formData.notification_account.map((username, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-700 rounded-lg p-3">
+                    <div className="flex items-center space-x-2">
+                      <User className="w-4 h-4 text-green-500" />
+                      <span className="text-white font-mono">{username}</span>
+                    </div>
+                    <button
+                      onClick={() => removeNotificationUser(username)}
+                      className="text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Добавление нового пользователя */}
+            <div className="flex space-x-2">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={newNotificationUser}
+                  onChange={(e) => setNewNotificationUser(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addNotificationUser()}
+                  placeholder="@username или username"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500"
+                />
+                {errors.notification_user && (
+                  <p className="mt-1 text-sm text-red-400 flex items-center space-x-1">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.notification_user}</span>
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={addNotificationUser}
+                disabled={!newNotificationUser.trim()}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Добавить</span>
+              </button>
+            </div>
+            
+            {formData.notification_account.length === 0 && (
+              <p className="text-gray-500 text-sm mt-2">
+                Добавьте пользователей для получения уведомлений о найденных клиентах
+              </p>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Основные настройки */}
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* Мониторинг чатов */}
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center">
-                <MessageSquare className="h-5 w-5 mr-2 text-green-500" />
-                Telegram чаты для мониторинга
-              </h3>
-
-              {/* Добавление нового чата */}
-              <div className="mb-4">
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={newChatUrl}
-                    onChange={(e) => setNewChatUrl(e.target.value)}
-                    placeholder="@канал или ссылка на чат"
-                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddChat()}
-                  />
-                  <button
-                    onClick={handleAddChat}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
-                {errors.newChat && (
-                  <p className="text-red-400 text-sm mt-1">{errors.newChat}</p>
-                )}
-              </div>
-
-              {/* Список чатов */}
-              <div className="space-y-2">
-                {formData.monitored_chats.length === 0 ? (
-                  <div className="text-center py-4 text-gray-400">
-                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>Нет добавленных чатов</p>
-                    <p className="text-sm">Добавьте Telegram каналы или группы для мониторинга</p>
-                  </div>
-                ) : (
-                  formData.monitored_chats.map((chat, index) => (
-                    <div key={index} className="flex items-center justify-between bg-gray-700 p-3 rounded-md">
-                      <span className="text-gray-200">{chat}</span>
-                      <button
-                        onClick={() => handleRemoveChat(index)}
-                        className="text-red-400 hover:text-red-300 transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Параметры мониторинга */}
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center">
-                <Settings className="h-5 w-5 mr-2 text-green-500" />
-                Параметры поиска
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Интервал проверки */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Интервал проверки (минуты)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="60"
-                    value={formData.check_interval_minutes}
-                    onChange={(e) => handleInputChange('check_interval_minutes', parseInt(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">Как часто проверять новые сообщения</p>
-                </div>
-
-                {/* Глубина поиска */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Глубина поиска (минуты)
-                  </label>
-                  <input
-                    type="number"
-                    min="5"
-                    max="1440"
-                    value={formData.lookback_minutes}
-                    onChange={(e) => handleInputChange('lookback_minutes', parseInt(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">На сколько назад искать сообщения</p>
-                </div>
-
-                {/* Порог ИИ */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Минимальная уверенность ИИ
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="range"
-                      min="1"
-                      max="10"
-                      value={formData.min_ai_confidence}
-                      onChange={(e) => handleInputChange('min_ai_confidence', parseInt(e.target.value))}
-                      className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="flex justify-between text-xs text-gray-400 mt-1">
-                      <span>1</span>
-                      <span className="font-medium text-green-400">{formData.min_ai_confidence}</span>
-                      <span>10</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">Минимальная оценка потенциального клиента</p>
-                </div>
-
-                {/* Аккаунт для уведомлений */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Telegram для уведомлений
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.notification_account}
-                    onChange={(e) => handleInputChange('notification_account', e.target.value)}
-                    placeholder="@username"
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">Куда отправлять уведомления о новых клиентах</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Кнопка сохранения */}
-            {hasChanges && (
-              <div className="flex justify-end">
-                <button
-                  onClick={handleSaveSettings}
-                  disabled={updateSettingsMutation.isPending}
-                  className="flex items-center px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                >
-                  {updateSettingsMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  Сохранить изменения
-                </button>
-              </div>
-            )}
+        {/* Кнопка сохранения */}
+        {hasChanges && (
+          <div className="mt-6 pt-4 border-t border-gray-700">
+            <button
+              onClick={handleSaveSettings}
+              disabled={updateSettingsMutation.isPending}
+              className="flex items-center space-x-2 px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
+            >
+              {updateSettingsMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              <span>Сохранить изменения</span>
+            </button>
           </div>
+        )}
+      </div>
 
-          {/* Боковая панель с информацией */}
-          <div className="space-y-6">
-            
-            {/* Статистика */}
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center">
-                <Target className="h-5 w-5 mr-2 text-green-500" />
-                Статистика
-              </h3>
-              
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Чатов в мониторинге:</span>
-                  <span className="text-gray-100 font-medium">{formData.monitored_chats.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Интервал проверки:</span>
-                  <span className="text-gray-100 font-medium">{formData.check_interval_minutes} мин</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Порог ИИ:</span>
-                  <span className="text-gray-100 font-medium">{formData.min_ai_confidence}/10</span>
-                </div>
-              </div>
+      {/* Статистика мониторинга */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-gray-800 rounded-lg p-6">
+          <div className="flex items-center space-x-3">
+            <Clock className="w-6 h-6 text-blue-500" />
+            <div>
+              <h3 className="text-lg font-semibold text-white">Последняя проверка</h3>
+              <p className="text-gray-400">
+                {currentSettings?.last_monitoring_check 
+                  ? new Date(currentSettings.last_monitoring_check).toLocaleString('ru-RU')
+                  : 'Не выполнялась'
+                }
+              </p>
             </div>
+          </div>
+        </div>
 
-            {/* Справка */}
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center">
-                <AlertCircle className="h-5 w-5 mr-2 text-blue-500" />
-                Как это работает
-              </h3>
-              
-              <div className="space-y-3 text-sm text-gray-400">
-                <div className="flex items-start space-x-2">
-                  <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5">1</div>
-                  <p>Система каждые {formData.check_interval_minutes} минут сканирует указанные чаты</p>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5">2</div>
-                  <p>При нахождении ключевых слов ИИ анализирует намерения пользователя</p>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5">3</div>
-                  <p>Если уверенность ≥ {formData.min_ai_confidence}, клиент добавляется в базу</p>
-                </div>
-              </div>
+        <div className="bg-gray-800 rounded-lg p-6">
+          <div className="flex items-center space-x-3">
+            <MessageSquare className="w-6 h-6 text-purple-500" />
+            <div>
+              <h3 className="text-lg font-semibold text-white">Отслеживаемые чаты</h3>
+              <p className="text-gray-400">{formData.monitored_chats.length} чатов</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 rounded-lg p-6">
+          <div className="flex items-center space-x-3">
+            <Target className="w-6 h-6 text-green-500" />
+            <div>
+              <h3 className="text-lg font-semibold text-white">Получатели уведомлений</h3>
+              <p className="text-gray-400">{formData.notification_account.length} пользователей</p>
             </div>
           </div>
         </div>
