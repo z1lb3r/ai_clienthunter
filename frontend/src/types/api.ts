@@ -84,5 +84,6 @@ export interface DashboardStats {
   clientsToday: number;
   clientsWeek: number;
   totalClients: number;
+  totalChats: number;
   conversionRate: number;
 }

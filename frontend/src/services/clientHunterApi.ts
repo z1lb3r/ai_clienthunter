@@ -142,6 +142,7 @@ class ClientHunterApi {
       clientsToday,
       clientsWeek,
       totalClients: clients.length,
+      totalChats: uniqueChats.size,
       conversionRate
     };
   }

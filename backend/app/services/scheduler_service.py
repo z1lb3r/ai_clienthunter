@@ -104,22 +104,22 @@ class SchedulerService:
                 return
             
             logger.info(f"Found {len(active_users)} active monitoring users")
-            
+       
             for user_data in active_users:
                 user_id = user_data['user_id']
-                settings_data = user_data
+                user_settings_data = user_data  # ← ПЕРЕИМЕНОВАНО
                 
                 if settings.ENABLE_DEBUG_LOGGING:
                     logger.debug(f"Checking monitoring for user {user_id}")
                 
                 # Проверяем, пора ли запускать мониторинг для этого пользователя
-                should_run = self._should_run_monitoring(settings_data)
+                should_run = self._should_run_monitoring(user_settings_data)  # ← ПЕРЕИМЕНОВАНО
                 
                 if should_run:
                     logger.info(f"Running monitoring for user {user_id}")
                     
                     # Запускаем мониторинг
-                    await self._run_monitoring_for_user(user_id, settings_data)
+                    await self._run_monitoring_for_user(user_id, user_settings_data)  # ← ПЕРЕИМЕНОВАНО
                     
                     # Обновляем время последней проверки
                     await self._update_last_monitoring_check(user_id)
@@ -136,10 +136,10 @@ class SchedulerService:
             logger.error(f"Error getting active monitoring users: {e}")
             return []
     
-    def _should_run_monitoring(self, settings: Dict[str, Any]) -> bool:
+    def _should_run_monitoring(self, user_settings: Dict[str, Any]) -> bool:  # ← ПЕРЕИМЕНОВАНО ПАРАМЕТР
         """Определить, нужно ли запускать мониторинг для пользователя"""
         try:
-            last_check = settings.get('last_monitoring_check')
+            last_check = user_settings.get('last_monitoring_check')  # ← ИСПРАВЛЕНО
             if not last_check:
                 return True  # Первый запуск
             
@@ -153,7 +153,7 @@ class SchedulerService:
             
             should_run = time_diff.total_seconds() >= check_interval
             
-            if settings.ENABLE_DEBUG_LOGGING:
+            if settings.ENABLE_DEBUG_LOGGING:  # ← ТЕПЕРЬ РАБОТАЕТ ПРАВИЛЬНО
                 logger.debug(f"Time since last check: {time_diff.total_seconds()}s, should run: {should_run}")
             
             return should_run
@@ -162,10 +162,10 @@ class SchedulerService:
             logger.error(f"Error determining if should run monitoring: {e}")
             return False
     
-    async def _run_monitoring_for_user(self, user_id: int, settings: Dict[str, Any]):
+    async def _run_monitoring_for_user(self, user_id: int, user_settings: Dict[str, Any]):  # ← ПЕРЕИМЕНОВАНО ПАРАМЕТР
         """Запустить мониторинг для конкретного пользователя"""
         try:
-            await self.monitoring_service.search_and_analyze(user_id, settings)
+            await self.monitoring_service.search_and_analyze(user_id, user_settings)  # ← ИСПРАВЛЕНО
         except Exception as e:
             logger.error(f"Error running monitoring for user {user_id}: {e}")
     
@@ -179,7 +179,7 @@ class SchedulerService:
                 'updated_at': current_time
             }).eq('user_id', user_id).execute()
             
-            if settings.ENABLE_DEBUG_LOGGING:
+            if settings.ENABLE_DEBUG_LOGGING:  # ← ТЕПЕРЬ РАБОТАЕТ ПРАВИЛЬНО
                 logger.debug(f"Updated last monitoring check for user {user_id}")
                 
         except Exception as e:
