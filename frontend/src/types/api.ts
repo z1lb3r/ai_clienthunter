@@ -4,11 +4,12 @@ export interface ProductTemplate {
   user_id: number;
   name: string;
   keywords: string[];
-  monitored_chats: string[];  // НОВОЕ ПОЛЕ
+  monitored_chats: string[];
   chat_ids: string[];
-  check_interval_minutes: number;  // НОВОЕ ПОЛЕ
-  lookback_minutes: number;  // НОВОЕ ПОЛЕ
-  min_ai_confidence: number;  // НОВОЕ ПОЛЕ
+  check_interval_minutes: number;
+  lookback_minutes: number;
+  min_ai_confidence: number;
+  ai_prompt: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -17,19 +18,21 @@ export interface ProductTemplate {
 export interface ProductTemplateCreate {
   name: string;
   keywords: string[];
-  monitored_chats?: string[];  // НОВОЕ ПОЛЕ
-  check_interval_minutes?: number;  // НОВОЕ ПОЛЕ
-  lookback_minutes?: number;  // НОВОЕ ПОЛЕ
-  min_ai_confidence?: number;  // НОВОЕ ПОЛЕ
+  monitored_chats?: string[];
+  check_interval_minutes?: number;
+  lookback_minutes?: number;
+  min_ai_confidence?: number;
+  ai_prompt: string;
 }
 
 export interface ProductTemplateUpdate {
   name?: string;
   keywords?: string[];
-  monitored_chats?: string[];  // НОВОЕ ПОЛЕ
-  check_interval_minutes?: number;  // НОВОЕ ПОЛЕ
-  lookback_minutes?: number;  // НОВОЕ ПОЛЕ
-  min_ai_confidence?: number;  // НОВОЕ ПОЛЕ
+  monitored_chats?: string[];
+  check_interval_minutes?: number;
+  lookback_minutes?: number;
+  min_ai_confidence?: number;
+  ai_prompt?: string;
   is_active?: boolean;
 }
 
