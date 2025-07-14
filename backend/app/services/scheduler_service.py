@@ -2,6 +2,7 @@
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import List, Dict, Any 
 
 from ..core.database import supabase_client
 from ..core.config import settings
