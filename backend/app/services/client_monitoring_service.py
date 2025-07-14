@@ -197,7 +197,7 @@ class ClientMonitoringService:
             cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=lookback_minutes)
             
             messages = await self.telegram_service.get_group_messages(
-                chat_id=chat_id,
+                group_id=chat_id,
                 limit=100,
                 offset_date=cutoff_time
             )
@@ -206,7 +206,7 @@ class ClientMonitoringService:
             filtered_messages = []
             for msg in messages:
                 msg_date = msg.get('date')
-                if msg_date and msg_date >= cutoff_time:
+                if msg_date and datetime.fromisoformat(msg_date.replace('Z', '+00:00')) >= cutoff_time:
                     filtered_messages.append(msg)
             
             logger.debug(f"Found {len(filtered_messages)} messages after time filtering")
