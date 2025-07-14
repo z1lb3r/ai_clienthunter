@@ -114,9 +114,24 @@ class ClientHunterApi {
   // ==================== DASHBOARD STATS ====================
   
   async getDashboardStats(): Promise<DashboardStats> {
-    // Получаем клиентов и вычисляем статистику
-    const clientsResponse = await this.getPotentialClients({ limit: 1000 });
+    // Получаем клиентов и шаблоны
+    const [clientsResponse, templatesResponse] = await Promise.all([
+      this.getPotentialClients({ limit: 1000 }),
+      this.getProductTemplates()
+    ]);
+    
     const clients = clientsResponse.data || [];
+    const templates = templatesResponse.data || [];
+
+    // Подсчитываем уникальные чаты из активных шаблонов
+    const uniqueChats = new Set<string>();
+    templates
+      .filter(template => template.is_active)
+      .forEach(template => {
+        if (template.chat_ids && Array.isArray(template.chat_ids)) {
+          template.chat_ids.forEach(chatId => uniqueChats.add(chatId));
+        }
+      });
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -142,7 +157,7 @@ class ClientHunterApi {
       clientsToday,
       clientsWeek,
       totalClients: clients.length,
-      totalChats: uniqueChats.size,
+      totalChats: uniqueChats.size, // ✅ Исправлено!
       conversionRate
     };
   }

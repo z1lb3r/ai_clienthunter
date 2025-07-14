@@ -21,13 +21,15 @@ import {
   useMonitoringSettings,
   useUpdateMonitoringSettings,
   useStartMonitoring,
-  useStopMonitoring
+  useStopMonitoring,
+  useProductTemplates  // ✅ Добавленный импорт
 } from '../hooks/useClientHunterApi';
 import { MonitoringSettingsUpdate } from '../types/api';
 
 export const MonitoringPage: React.FC = () => {
   // API хуки
   const { data: settingsResponse, isLoading: settingsLoading } = useMonitoringSettings();
+  const { data: templatesResponse } = useProductTemplates(); // ✅ Добавленный хук
   const updateSettingsMutation = useUpdateMonitoringSettings();
   const startMonitoringMutation = useStartMonitoring();
   const stopMonitoringMutation = useStopMonitoring();
@@ -47,17 +49,31 @@ export const MonitoringPage: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false);
 
   const currentSettings = settingsResponse?.data;
+  const templates = templatesResponse?.data || []; // ✅ Добавленная обработка шаблонов
   const isMonitoringActive = currentSettings?.is_active || false;
+
+  // ✅ Функция подсчета уникальных чатов из активных шаблонов
+  const getTotalUniqueChats = () => {
+    const uniqueChats = new Set<string>();
+    templates
+      .filter(template => template.is_active)
+      .forEach(template => {
+        if (template.chat_ids && Array.isArray(template.chat_ids)) {
+          template.chat_ids.forEach(chatId => uniqueChats.add(chatId));
+        }
+      });
+    return uniqueChats.size;
+  };
 
   // Инициализация формы
   useEffect(() => {
     if (currentSettings) {
       setFormData({
-        monitored_chats: currentSettings.monitored_chats || [],
+        monitored_chats: [], // Убираем устаревшие чаты из MonitoringSettings
         notification_account: currentSettings.notification_account || [],
-        check_interval_minutes: currentSettings.check_interval_minutes || 5,
-        lookback_minutes: currentSettings.lookback_minutes || 60,
-        min_ai_confidence: currentSettings.min_ai_confidence || 7
+        check_interval_minutes: 5,
+        lookback_minutes: 60,
+        min_ai_confidence: 7
       });
     }
   }, [currentSettings]);
@@ -76,7 +92,7 @@ export const MonitoringPage: React.FC = () => {
     if (!validateChatUrl(trimmedUrl)) {
       setErrors(prev => ({ 
         ...prev, 
-        chat_url: 'Неверный формат ссылки. Используйте https://t.me/username или @username' 
+        chat_url: 'Неверный формат ссылки. Используйте: t.me/username или @username' 
       }));
       return;
     }
@@ -94,79 +110,65 @@ export const MonitoringPage: React.FC = () => {
       monitored_chats: [...prev.monitored_chats, trimmedUrl]
     }));
     setNewChatUrl('');
+    setErrors(prev => ({ ...prev, chat_url: '' }));
     setHasChanges(true);
-    
-    // Убираем ошибку
-    setErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors.chat_url;
-      return newErrors;
-    });
   };
 
-  const removeChat = (chatUrl: string) => {
+  const removeChat = (chatToRemove: string) => {
     setFormData(prev => ({
       ...prev,
-      monitored_chats: prev.monitored_chats.filter(chat => chat !== chatUrl)
+      monitored_chats: prev.monitored_chats.filter(chat => chat !== chatToRemove)
     }));
     setHasChanges(true);
   };
 
   // Функции для управления пользователями уведомлений
+  const validateNotificationUser = (user: string): boolean => {
+    const telegramUserPattern = /^@?[a-zA-Z0-9_]+$/;
+    return telegramUserPattern.test(user);
+  };
+
   const addNotificationUser = () => {
     const trimmedUser = newNotificationUser.trim();
     if (!trimmedUser) return;
     
-    // Проверяем формат username
-    let cleanUsername = trimmedUser;
-    if (!cleanUsername.startsWith('@')) {
-      cleanUsername = '@' + cleanUsername;
-    }
-    
-    // Валидация
-    const usernamePattern = /^@[a-zA-Z0-9_]+$/;
-    if (!usernamePattern.test(cleanUsername)) {
-      setErrors(prev => ({
-        ...prev,
-        notification_user: 'Неверный формат username. Используйте только буквы, цифры и _'
+    if (!validateNotificationUser(trimmedUser)) {
+      setErrors(prev => ({ 
+        ...prev, 
+        notification_user: 'Неверный формат. Используйте: @username или username' 
       }));
       return;
     }
     
-    // Проверяем дубликаты
-    if (formData.notification_account.includes(cleanUsername)) {
-      setErrors(prev => ({
-        ...prev,
-        notification_user: 'Этот пользователь уже добавлен'
+    const normalizedUser = trimmedUser.startsWith('@') ? trimmedUser : `@${trimmedUser}`;
+    
+    if (formData.notification_account.includes(normalizedUser)) {
+      setErrors(prev => ({ 
+        ...prev, 
+        notification_user: 'Этот пользователь уже добавлен' 
       }));
       return;
     }
     
     setFormData(prev => ({
       ...prev,
-      notification_account: [...prev.notification_account, cleanUsername]
+      notification_account: [...prev.notification_account, normalizedUser]
     }));
     setNewNotificationUser('');
+    setErrors(prev => ({ ...prev, notification_user: '' }));
     setHasChanges(true);
-    
-    // Убираем ошибку
-    setErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors.notification_user;
-      return newErrors;
-    });
   };
 
-  const removeNotificationUser = (username: string) => {
+  const removeNotificationUser = (userToRemove: string) => {
     setFormData(prev => ({
       ...prev,
-      notification_account: prev.notification_account.filter(user => user !== username)
+      notification_account: prev.notification_account.filter(user => user !== userToRemove)
     }));
     setHasChanges(true);
   };
 
-  // Обработчики изменения полей
-  const handleInputChange = (field: string, value: any) => {
+  // Обработчик изменения полей формы
+  const handleFieldChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };
@@ -274,15 +276,15 @@ export const MonitoringPage: React.FC = () => {
             
             {/* Список текущих пользователей */}
             {formData.notification_account.length > 0 && (
-              <div className="mb-4 space-y-2">
-                {formData.notification_account.map((username, index) => (
-                  <div key={index} className="flex items-center justify-between bg-gray-700 rounded-lg p-3">
+              <div className="space-y-2 mb-4">
+                {formData.notification_account.map((user, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-700 rounded-lg px-3 py-2">
                     <div className="flex items-center space-x-2">
-                      <User className="w-4 h-4 text-green-500" />
-                      <span className="text-white font-mono">{username}</span>
+                      <User className="w-4 h-4 text-gray-400" />
+                      <span className="text-white">{user}</span>
                     </div>
                     <button
-                      onClick={() => removeNotificationUser(username)}
+                      onClick={() => removeNotificationUser(user)}
                       className="text-red-400 hover:text-red-300 transition-colors"
                     >
                       <X className="w-4 h-4" />
@@ -292,7 +294,7 @@ export const MonitoringPage: React.FC = () => {
               </div>
             )}
             
-            {/* Добавление нового пользователя */}
+            {/* Форма добавления пользователя */}
             <div className="flex space-x-2">
               <div className="flex-1">
                 <input
@@ -369,7 +371,8 @@ export const MonitoringPage: React.FC = () => {
             <MessageSquare className="w-6 h-6 text-purple-500" />
             <div>
               <h3 className="text-lg font-semibold text-white">Отслеживаемые чаты</h3>
-              <p className="text-gray-400">{formData.monitored_chats.length} чатов</p>
+              {/* ✅ ИСПРАВЛЕНО: Теперь показывает чаты из активных шаблонов */}
+              <p className="text-gray-400">{getTotalUniqueChats()} чатов</p>
             </div>
           </div>
         </div>
