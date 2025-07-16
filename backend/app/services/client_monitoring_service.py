@@ -67,7 +67,9 @@ class ClientMonitoringService:
             return None
     
     async def _search_and_analyze(self, user_id: int, settings: Dict[str, Any]):
+        
         """Основной метод поиска и анализа клиентов с подробным логированием"""
+        logger.info(f"🔥 ВХОД В _search_and_analyze для пользователя {user_id}")
         try:
             logger.info(f"🚀 ЗАПУСК МОНИТОРИНГА для пользователя {user_id}")
             
