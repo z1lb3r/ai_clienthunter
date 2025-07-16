@@ -66,76 +66,87 @@ class ClientMonitoringService:
             logger.error(f"Error getting user settings: {e}")
             return None
     
-    async def search_and_analyze(self, user_id: int, settings: Dict[str, Any]):
-        """Публичный метод для одноразового поиска и анализа"""
-        await self._search_and_analyze(user_id, settings)
-    
     async def _search_and_analyze(self, user_id: int, settings: Dict[str, Any]):
-        """Основной метод поиска и анализа клиентов"""
+        """Основной метод поиска и анализа клиентов с подробным логированием"""
         try:
-            logger.info(f"Starting client search and analysis for user {user_id}")
+            logger.info(f"🚀 ЗАПУСК МОНИТОРИНГА для пользователя {user_id}")
             
             # Получаем шаблоны
             templates = await self._get_user_templates(user_id)
             if not templates:
-                logger.info(f"No active templates found for user {user_id}")
+                logger.info(f"❌ Нет активных шаблонов для пользователя {user_id}")
                 return
             
-            logger.info(f"Found {len(templates)} active templates for user {user_id}")
+            logger.info(f"📋 Найдено {len(templates)} активных шаблонов")
             
-            # Статистика
+            # Статистика по всему циклу
             total_messages_found = 0
             total_keyword_matches = 0
-            total_potential_clients = 0
+            total_ai_analyzed = 0
+            total_clients_found = 0
             
             # Обрабатываем каждый шаблон
-            for template in templates:
+            for template_idx, template in enumerate(templates, 1):
                 template_name = template.get('name', 'Unknown')
-                logger.info(f"Processing template: {template_name}")
+                template_id = template.get('id', 'Unknown')
+                
+                logger.info(f"📊 ШАБЛОН {template_idx}/{len(templates)}: '{template_name}' (ID: {template_id})")
                 
                 # Парсим keywords
                 keywords = self._parse_keywords(template.get('keywords'))
                 if not keywords:
-                    logger.warning(f"No valid keywords in template {template_name}")
+                    logger.warning(f"⚠️ Нет ключевых слов в шаблоне '{template_name}' - пропускаем")
                     continue
+                    
+                logger.info(f"🔑 Ключевые слова: {keywords}")
                 
                 # Получаем чаты для этого шаблона
                 monitored_chats = template.get('chat_ids', [])
                 if not monitored_chats:
-                    logger.warning(f"No monitored chats in template {template_name}")
+                    logger.warning(f"⚠️ Нет чатов для мониторинга в шаблоне '{template_name}' - пропускаем")
                     continue
+                    
+                logger.info(f"💬 Мониторим {len(monitored_chats)} чатов: {monitored_chats}")
                 
-                logger.debug(f"Template {template_name}: {len(keywords)} keywords, {len(monitored_chats)} chats")
+                # Статистика по шаблону
+                template_messages = 0
+                template_keyword_matches = 0
+                template_ai_analyzed = 0
+                template_clients_found = 0
                 
                 # Обрабатываем каждый чат
-                template_matches = 0
-                for chat_id in monitored_chats:
+                for chat_idx, chat_id in enumerate(monitored_chats, 1):
                     try:
+                        logger.info(f"  📱 ЧАТ {chat_idx}/{len(monitored_chats)}: {chat_id}")
+                        
                         # Получаем сообщения
                         lookback_minutes = template.get('lookback_minutes', 5)
                         messages = await self._get_recent_messages(chat_id, lookback_minutes)
                         
                         if not messages:
+                            logger.info(f"    📭 Нет новых сообщений за последние {lookback_minutes} минут")
                             continue
                             
-                        total_messages_found += len(messages)
-                        logger.debug(f"Chat {chat_id}: found {len(messages)} recent messages")
+                        template_messages += len(messages)
+                        logger.info(f"    📨 Найдено {len(messages)} сообщений за последние {lookback_minutes} минут")
                         
                         # Анализируем каждое сообщение
+                        chat_keyword_matches = 0
                         for message in messages:
                             matched_keywords = self._find_keywords_in_message(
                                 message.get('message', ''), keywords
                             )
                             
                             if matched_keywords:
-                                total_keyword_matches += 1
-                                template_matches += 1
+                                chat_keyword_matches += 1
+                                template_keyword_matches += 1
                                 
-                                if settings.ENABLE_DEBUG_LOGGING:
-                                    logger.debug(f"Keywords match in chat {chat_id}: {matched_keywords}")
+                                logger.info(f"    🎯 СОВПАДЕНИЕ ключевых слов: {matched_keywords}")
+                                logger.info(f"    💬 Сообщение: '{message.get('message', '')[:100]}...'")
                                 
                                 # Анализ через ИИ
                                 try:
+                                    template_ai_analyzed += 1
                                     await self._analyze_message_with_ai(
                                         user_id, chat_id, 
                                         message.get('chat_title', f'Chat {chat_id}'),
@@ -146,26 +157,45 @@ class ClientMonitoringService:
                                         },
                                         settings
                                     )
-                                    total_potential_clients += 1
+                                    template_clients_found += 1  # Увеличиваем только если AI анализ прошел успешно
+                                    
                                 except Exception as ai_error:
-                                    logger.error(f"AI analysis failed for message: {ai_error}")
+                                    logger.error(f"    ❌ Ошибка AI анализа: {ai_error}")
+                        
+                        if chat_keyword_matches > 0:
+                            logger.info(f"    ✅ Чат обработан: {chat_keyword_matches} совпадений ключевых слов")
+                        else:
+                            logger.info(f"    ⚪ Чат обработан: совпадений не найдено")
                     
                     except Exception as chat_error:
-                        logger.error(f"Error processing chat {chat_id}: {chat_error}")
+                        logger.error(f"    ❌ Ошибка обработки чата {chat_id}: {chat_error}")
                         continue
                 
-                logger.info(f"Template {template_name} completed: {template_matches} keyword matches")
+                # Статистика по шаблону
+                logger.info(f"📈 ИТОГ ШАБЛОНА '{template_name}':")
+                logger.info(f"   📨 Сообщений проанализировано: {template_messages}")
+                logger.info(f"   🎯 Совпадений ключевых слов: {template_keyword_matches}")
+                logger.info(f"   🤖 Отправлено в AI: {template_ai_analyzed}")
+                logger.info(f"   ✅ Потенциальных клиентов: {template_clients_found}")
+                
+                # Добавляем к общей статистике
+                total_messages_found += template_messages
+                total_keyword_matches += template_keyword_matches
+                total_ai_analyzed += template_ai_analyzed
+                total_clients_found += template_clients_found
             
-            # Финальная статистика
-            logger.info(f"Analysis completed for user {user_id}: "
-                       f"{total_messages_found} messages, "
-                       f"{total_keyword_matches} keyword matches, "
-                       f"{total_potential_clients} potential clients analyzed")
+            # Финальная статистика по всему циклу
+            logger.info(f"🏁 ИТОГ МОНИТОРИНГА для пользователя {user_id}:")
+            logger.info(f"   📋 Шаблонов обработано: {len(templates)}")
+            logger.info(f"   📨 Всего сообщений: {total_messages_found}")
+            logger.info(f"   🎯 Совпадений ключевых слов: {total_keyword_matches}")
+            logger.info(f"   🤖 Отправлено в AI: {total_ai_analyzed}")
+            logger.info(f"   ✅ Найдено клиентов: {total_clients_found}")
             
         except Exception as e:
-            logger.error(f"Critical error in search and analyze: {e}")
+            logger.error(f"💥 КРИТИЧЕСКАЯ ОШИБКА в мониторинге пользователя {user_id}: {e}")
             raise
-    
+        
     def _parse_keywords(self, keywords_raw) -> List[str]:
         """Парсинг ключевых слов из БД"""
         if isinstance(keywords_raw, list):
@@ -238,7 +268,7 @@ class ClientMonitoringService:
         message_data: Dict[str, Any], 
         settings: Dict[str, Any]
     ):
-        """Анализ сообщения через ИИ"""
+        """Анализ сообщения через ИИ - упрощенная логика"""
         try:
             message = message_data['message']
             template = message_data['template']
@@ -259,40 +289,48 @@ class ClientMonitoringService:
             
             message_text = message.get('message', '')
             
-            # Логируем только в DEBUG режиме
-            if settings.ENABLE_DEBUG_LOGGING and settings.LOG_MESSAGE_CONTENT:
-                logger.debug(f"AI analysis for message: {message_text[:100]}...")
+            logger.info(f"🤖 AI анализ сообщения от @{author_info.get('username', 'unknown')} в чате {chat_name}")
             
-            # Вызываем ИИ анализ
+            # Вызываем ИИ анализ (убрали custom_prompt и confidence)
             ai_result = await self.openai_service.analyze_potential_client(
                 message_text=message_text,
                 product_name=template.get('name', 'Unknown Product'),
                 keywords=template.get('keywords', []),
                 matched_keywords=matched_keywords,
                 author_info=author_info,
-                chat_info=chat_info,
-                custom_prompt=template.get('ai_prompt', '')
+                chat_info=chat_info
             )
             
-            confidence = ai_result.get('confidence', 0)
-            min_confidence = template.get('min_ai_confidence', 7)
-            
-            if confidence >= min_confidence:
+            # Простая проверка: клиент или нет
+            if ai_result.get('is_client', False):
+                logger.info(f"✅ AI определил как КЛИЕНТА: {ai_result.get('reasoning', '')[:100]}...")
+                
                 # Сохраняем потенциального клиента
                 await self._save_potential_client(
-                    user_id, message, template, matched_keywords, ai_result, chat_id, chat_name
+                    user_id=user_id,
+                    template_id=template.get('id'),
+                    message_data=message,
+                    author_info=author_info,
+                    chat_info=chat_info,
+                    ai_analysis=ai_result,
+                    matched_keywords=matched_keywords
                 )
-                
-                # Отправляем уведомления
-                await self._send_notifications(user_id, message, template, ai_result, settings)
-                
-                logger.info(f"Potential client found: confidence {confidence}/10, template '{template.get('name')}'")
             else:
-                logger.debug(f"Low confidence ({confidence}/10), skipping client")
+                logger.info(f"❌ AI определил как НЕ КЛИЕНТА: {ai_result.get('reasoning', '')[:100]}...")
                 
         except Exception as e:
-            logger.error(f"Error in AI analysis: {e}")
-            raise
+            logger.error(f"Ошибка AI анализа: {e}")
+            
+            # При ошибке сохраняем для ручной проверки
+            await self._save_potential_client(
+                user_id=user_id,
+                template_id=message_data['template'].get('id'),
+                message_data=message_data['message'],
+                author_info={'telegram_id': 'error', 'username': 'error'},
+                chat_info={'chat_id': chat_id, 'chat_name': chat_name},
+                ai_analysis={'is_client': True, 'reasoning': f'Ошибка AI: {str(e)}', 'error': True},
+                matched_keywords=message_data['matched_keywords']
+            )
     
     async def _save_potential_client(
         self, 
