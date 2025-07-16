@@ -93,39 +93,52 @@ class SchedulerService:
     async def _monitor_all_users(self):
         """Проверить всех пользователей на необходимость мониторинга"""
         try:
-            if settings.ENABLE_DEBUG_LOGGING:
-                logger.debug("Running scheduled client monitoring check")
+            logger.info("🔍 Начинаем проверку пользователей")
             
             # Получаем всех пользователей с активным мониторингом
             active_users = await self._get_active_monitoring_users()
             
             if not active_users:
-                logger.debug("No active monitoring users found")
+                logger.info("❌ Нет активных пользователей для мониторинга")
                 return
             
-            logger.info(f"Found {len(active_users)} active monitoring users")
-       
+            logger.info(f"👥 Найдено {len(active_users)} активных пользователей")
+    
             for user_data in active_users:
-                user_id = user_data['user_id']
-                user_settings_data = user_data  # ← ПЕРЕИМЕНОВАНО
-                
-                if settings.ENABLE_DEBUG_LOGGING:
-                    logger.debug(f"Checking monitoring for user {user_id}")
-                
-                # Проверяем, пора ли запускать мониторинг для этого пользователя
-                should_run = self._should_run_monitoring(user_settings_data)  # ← ПЕРЕИМЕНОВАНО
-                
-                if should_run:
-                    logger.info(f"Running monitoring for user {user_id}")
+                try:
+                    logger.info(f"📋 ОБРАБАТЫВАЕМ пользователя: {user_data}")
                     
-                    # Запускаем мониторинг
-                    await self._run_monitoring_for_user(user_id, user_settings_data)  # ← ПЕРЕИМЕНОВАНО
+                    user_id = user_data['user_id']
+                    user_settings_data = user_data
                     
-                    # Обновляем время последней проверки
-                    await self._update_last_monitoring_check(user_id)
-                
+                    logger.info(f"👤 Проверяем пользователя {user_id}")
+                    
+                    # Проверяем, пора ли запускать мониторинг для этого пользователя
+                    should_run = self._should_run_monitoring(user_settings_data)
+                    logger.info(f"⏰ Результат проверки времени для пользователя {user_id}: {should_run}")
+                    
+                    if should_run:
+                        logger.info(f"🚀 ЗАПУСКАЕМ мониторинг для пользователя {user_id}")
+                        
+                        # Запускаем мониторинг
+                        await self._run_monitoring_for_user(user_id, user_settings_data)
+                        
+                        # Обновляем время последней проверки
+                        await self._update_last_monitoring_check(user_id)
+                        
+                        logger.info(f"✅ Мониторинг для пользователя {user_id} завершен")
+                    else:
+                        logger.info(f"⏸️ НЕ ЗАПУСКАЕМ мониторинг для пользователя {user_id} - время еще не пришло")
+                        
+                except Exception as user_error:
+                    logger.error(f"💥 Ошибка обработки пользователя {user_data.get('user_id', 'unknown')}: {user_error}")
+                    continue
+                    
         except Exception as e:
-            logger.error(f"Error in monitor_all_users: {e}")
+            logger.error(f"💥 КРИТИЧЕСКАЯ ошибка в monitor_all_users: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+
     
     async def _get_active_monitoring_users(self) -> List[Dict[str, Any]]:
         """Получить пользователей с активным мониторингом"""
