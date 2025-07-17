@@ -149,30 +149,33 @@ class SchedulerService:
             logger.error(f"Error getting active monitoring users: {e}")
             return []
     
-    def _should_run_monitoring(self, user_settings: Dict[str, Any]) -> bool:  # ← ПЕРЕИМЕНОВАНО ПАРАМЕТР
-        """Определить, нужно ли запускать мониторинг для пользователя"""
+    def _should_run_monitoring(self, user_settings: Dict[str, Any]) -> bool:
+        """ВРЕМЕННО: Принудительно запускаем мониторинг для тестирования"""
         try:
-            last_check = user_settings.get('last_monitoring_check')  # ← ИСПРАВЛЕНО
-            if not last_check:
-                return True  # Первый запуск
+            last_check = user_settings.get('last_monitoring_check')
+            user_id = user_settings.get('user_id', 'unknown')
             
-            # Парсим время последней проверки
+            if not last_check:
+                logger.info(f"✅ Первый запуск для пользователя {user_id}")
+                return True
+                
+            # Парсим время
             last_check_time = datetime.fromisoformat(last_check.replace('Z', '+00:00'))
             current_time = datetime.now(timezone.utc)
-            
-            # Проверяем, прошло ли достаточно времени
             time_diff = current_time - last_check_time
-            check_interval = 5 * 60  # 5 минут по умолчанию
             
-            should_run = time_diff.total_seconds() >= check_interval
+            # ВРЕМЕННО: Запускаем если прошло больше 30 секунд
+            should_run = time_diff.total_seconds() >= 30
             
-            if settings.ENABLE_DEBUG_LOGGING:  # ← ТЕПЕРЬ РАБОТАЕТ ПРАВИЛЬНО
-                logger.debug(f"Time since last check: {time_diff.total_seconds()}s, should run: {should_run}")
+            if should_run:
+                logger.info(f"🚀 ПРИНУДИТЕЛЬНО ЗАПУСКАЕМ мониторинг для пользователя {user_id} (прошло {time_diff.total_seconds():.1f}s)")
+            else:
+                logger.info(f"⏸️ Ждем еще {30 - time_diff.total_seconds():.1f}s до принудительного запуска")
             
             return should_run
             
         except Exception as e:
-            logger.error(f"Error determining if should run monitoring: {e}")
+            logger.error(f"💥 Ошибка: {e}")
             return False
     
     async def _run_monitoring_for_user(self, user_id: int, user_settings: Dict[str, Any]):  # ← ПЕРЕИМЕНОВАНО ПАРАМЕТР
