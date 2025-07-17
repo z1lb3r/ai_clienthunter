@@ -67,9 +67,8 @@ class ClientMonitoringService:
             return None
     
     async def search_and_analyze(self, user_id: int, settings: Dict[str, Any]):
-        
         """Основной метод поиска и анализа клиентов с подробным логированием"""
-        logger.info(f"🔥 ВХОД В _search_and_analyze для пользователя {user_id}")
+        logger.info(f"🔥 ВХОД В search_and_analyze для пользователя {user_id}")
         try:
             logger.info(f"🚀 ЗАПУСК МОНИТОРИНГА для пользователя {user_id}")
             
@@ -134,35 +133,60 @@ class ClientMonitoringService:
                         
                         # Анализируем каждое сообщение
                         chat_keyword_matches = 0
-                        for message in messages:
-                            matched_keywords = self._find_keywords_in_message(
-                                message.get('message', ''), keywords
-                            )
-                            
-                            if matched_keywords:
-                                chat_keyword_matches += 1
-                                template_keyword_matches += 1
+                        logger.info(f"    🔄 НАЧИНАЕМ обработку {len(messages)} сообщений")
+                        logger.info(f"    🔑 Ключевые слова для поиска: {keywords} (количество: {len(keywords)})")
+
+                        for msg_idx, message in enumerate(messages, 1):
+                            try:
+                                message_text = message.get('message', '')
                                 
-                                logger.info(f"    🎯 СОВПАДЕНИЕ ключевых слов: {matched_keywords}")
-                                logger.info(f"    💬 Сообщение: '{message.get('message', '')[:100]}...'")
+                                logger.info(f"    📨 СООБЩЕНИЕ {msg_idx}/{len(messages)}:")
+                                logger.info(f"        📝 Текст: '{message_text}'")
+                                logger.info(f"        📏 Длина: {len(message_text)} символов")
                                 
-                                # Анализ через ИИ
-                                try:
-                                    template_ai_analyzed += 1
-                                    await self._analyze_message_with_ai(
-                                        user_id, chat_id, 
-                                        message.get('chat_title', f'Chat {chat_id}'),
-                                        {
-                                            'message': message,
-                                            'template': template,
-                                            'matched_keywords': matched_keywords
-                                        },
-                                        settings
-                                    )
-                                    template_clients_found += 1  # Увеличиваем только если AI анализ прошел успешно
+                                # Проверяем условия перед вызовом функции поиска
+                                if not message_text:
+                                    logger.info(f"        ⚠️ Пустое сообщение - пропускаем")
+                                    continue
                                     
-                                except Exception as ai_error:
-                                    logger.error(f"    ❌ Ошибка AI анализа: {ai_error}")
+                                if not keywords:
+                                    logger.info(f"        ⚠️ Нет ключевых слов - пропускаем")
+                                    continue
+                                    
+                                logger.info(f"        🚀 ВЫЗЫВАЕМ _find_keywords_in_message")
+                                
+                                matched_keywords = self._find_keywords_in_message(message_text, keywords)
+                                
+                                logger.info(f"        ✅ РЕЗУЛЬТАТ поиска: {matched_keywords}")
+                                
+                                if matched_keywords:
+                                    chat_keyword_matches += 1
+                                    template_keyword_matches += 1
+                                    
+                                    logger.info(f"    🎯 СОВПАДЕНИЕ ключевых слов: {matched_keywords}")
+                                    logger.info(f"    💬 Сообщение: '{message_text[:100]}...'")
+                                    
+                                    # Анализ через ИИ
+                                    try:
+                                        template_ai_analyzed += 1
+                                        await self._analyze_message_with_ai(
+                                            user_id, chat_id, 
+                                            message.get('chat_title', f'Chat {chat_id}'),
+                                            {
+                                                'message': message,
+                                                'template': template,
+                                                'matched_keywords': matched_keywords
+                                            },
+                                            settings
+                                        )
+                                        template_clients_found += 1
+                                        
+                                    except Exception as ai_error:
+                                        logger.error(f"    ❌ Ошибка AI анализа: {ai_error}")
+                                        
+                            except Exception as msg_error:
+                                logger.error(f"    ❌ Ошибка обработки сообщения {msg_idx}: {msg_error}")
+                                continue
                         
                         if chat_keyword_matches > 0:
                             logger.info(f"    ✅ Чат обработан: {chat_keyword_matches} совпадений ключевых слов")
@@ -197,7 +221,7 @@ class ClientMonitoringService:
         except Exception as e:
             logger.error(f"💥 КРИТИЧЕСКАЯ ОШИБКА в мониторинге пользователя {user_id}: {e}")
             raise
-        
+            
     def _parse_keywords(self, keywords_raw) -> List[str]:
         """Парсинг ключевых слов из БД"""
         if isinstance(keywords_raw, list):
@@ -253,13 +277,21 @@ class ClientMonitoringService:
         if not message_text or not keywords:
             return []
         
+        logger.info(f"🔍 ПОИСК: '{message_text}'")
+        logger.info(f"🔑 Ключевые слова: {keywords}")
+        
         found_keywords = []
         message_lower = message_text.lower()
         
         for keyword in keywords:
-            if keyword.lower() in message_lower:
+            keyword_lower = keyword.lower()
+            if keyword_lower in message_lower:
                 found_keywords.append(keyword)
+                logger.info(f"   ✅ '{keyword}' → НАЙДЕНО")
+            else:
+                logger.info(f"   ❌ '{keyword}' → НЕ НАЙДЕНО")
         
+        logger.info(f"🎯 Итого найдено: {found_keywords}")
         return found_keywords
     
     async def _analyze_message_with_ai(
