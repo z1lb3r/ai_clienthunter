@@ -150,7 +150,7 @@ class SchedulerService:
             return []
     
     def _should_run_monitoring(self, user_settings: Dict[str, Any]) -> bool:
-        """ВРЕМЕННО: Принудительно запускаем мониторинг для тестирования"""
+        """Определить, нужно ли запускать мониторинг для пользователя"""
         try:
             last_check = user_settings.get('last_monitoring_check')
             user_id = user_settings.get('user_id', 'unknown')
@@ -163,21 +163,22 @@ class SchedulerService:
             last_check_time = datetime.fromisoformat(last_check.replace('Z', '+00:00'))
             current_time = datetime.now(timezone.utc)
             time_diff = current_time - last_check_time
+            check_interval = 5 * 60  # 5 минут
             
-            # ВРЕМЕННО: Запускаем если прошло больше 30 секунд
-            should_run = time_diff.total_seconds() >= 30
+            should_run = time_diff.total_seconds() >= check_interval
             
             if should_run:
-                logger.info(f"🚀 ПРИНУДИТЕЛЬНО ЗАПУСКАЕМ мониторинг для пользователя {user_id} (прошло {time_diff.total_seconds():.1f}s)")
+                logger.info(f"✅ Запускаем мониторинг для пользователя {user_id}: прошло {time_diff.total_seconds():.1f}s")
             else:
-                logger.info(f"⏸️ Ждем еще {30 - time_diff.total_seconds():.1f}s до принудительного запуска")
+                logger.debug(f"⏸️ Ждем еще {check_interval - time_diff.total_seconds():.1f}s")
             
             return should_run
             
         except Exception as e:
-            logger.error(f"💥 Ошибка: {e}")
+            logger.error(f"💥 Ошибка определения времени: {e}")
             return False
-    
+        
+        
     async def _run_monitoring_for_user(self, user_id: int, user_settings: Dict[str, Any]):  # ← ПЕРЕИМЕНОВАНО ПАРАМЕТР
         """Запустить мониторинг для конкретного пользователя"""
         try:
