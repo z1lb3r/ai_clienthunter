@@ -65,15 +65,11 @@ export const DashboardPage: React.FC = () => {
 
     const templateStats = templates.map(template => {
       const templateClients = clients.filter(client => client.matched_template_id === template.id);
-      const avgConfidence = templateClients.length > 0 
-        ? templateClients.reduce((sum, client) => sum + client.ai_confidence, 0) / templateClients.length
-        : 0;
 
       return {
         id: template.id,
         name: template.name,
-        clients: templateClients.length,
-        confidence: Math.round(avgConfidence * 10) / 10
+        clients: templateClients.length
       };
     });
 
@@ -259,9 +255,6 @@ export const DashboardPage: React.FC = () => {
                                 <span className="text-green-400 ml-2">@{client.username}</span>
                               )}
                             </h4>
-                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                              {(client.ai_confidence * 100).toFixed(0)}% уверенность
-                            </span>
                           </div>
                           
                           <p className="text-gray-300 text-sm mb-2">
@@ -331,8 +324,8 @@ export const DashboardPage: React.FC = () => {
                         <p className="text-xs text-gray-400">{template.clients} клиентов</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium text-green-400">{template.confidence}</p>
-                        <p className="text-xs text-gray-400">ср. увер.</p>
+                        <p className="text-sm font-medium text-green-400">#{index + 1}</p>
+                        <p className="text-xs text-gray-400">место</p>
                       </div>
                     </div>
                   ))}

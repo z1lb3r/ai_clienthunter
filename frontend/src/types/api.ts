@@ -62,7 +62,6 @@ export interface PotentialClient {
   message_text: string;
   matched_template_id: number;
   matched_keywords: string[];
-  ai_confidence: number;
   chat_id: string;
   message_id: number;
   client_status: 'new' | 'contacted' | 'ignored' | 'converted';

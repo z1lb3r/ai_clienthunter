@@ -393,11 +393,10 @@ class ClientMonitoringService:
                 'username': message.get('username', ''),
                 'first_name': message.get('first_name', ''),
                 'last_name': message.get('last_name', ''),
-                'message_text': message.get('message', ''),
+                'message_text': message.get('text', ''),  # ← ИСПРАВЛЕНО: было 'message'
                 'matched_template_id': template.get('id'),
                 'matched_keywords': matched_keywords,
-                'ai_confidence': ai_result.get('confidence', 0),
-                'ai_reasoning': ai_result.get('reasoning', ''),
+                'reasoning': ai_result.get('reasoning', ''),  # ← ИСПРАВЛЕНО: было 'ai_reasoning'
                 'intent_type': ai_result.get('intent_type', ''),
                 'chat_id': chat_id,
                 'chat_title': chat_name,
@@ -406,6 +405,7 @@ class ClientMonitoringService:
                 'created_at': datetime.now().isoformat(),
                 'updated_at': datetime.now().isoformat()
             }
+            # ← УБРАНО: 'ai_confidence' (система упрощена)
             
             result = supabase_client.table('potential_clients').insert(client_data).execute()
             
@@ -438,7 +438,7 @@ class ClientMonitoringService:
             # Отправляем уведомления
             for account in notification_accounts:
                 try:
-                    await self.telegram_service.send_message(account, notification_text)
+                    await self.telegram_service.send_private_message(account, notification_text)  # ← ИСПРАВЛЕНО: было send_message
                     logger.info(f"Notification sent to {account}")
                 except Exception as send_error:
                     logger.error(f"Failed to send notification to {account}: {send_error}")
@@ -457,7 +457,6 @@ class ClientMonitoringService:
 
     👤 Пользователь: @{message.get('username', 'unknown')} ({message.get('first_name', '')})
     📋 Шаблон: {template.get('name', 'Unknown')}
-    🎯 Уверенность ИИ: {ai_result.get('confidence', 0)}/10
     💭 Тип намерения: {ai_result.get('intent_type', 'unknown')}
 
     📝 Сообщение:
