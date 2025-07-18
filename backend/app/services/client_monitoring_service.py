@@ -364,17 +364,17 @@ class ClientMonitoringService:
         except Exception as e:
             logger.error(f"Ошибка AI анализа: {e}")
             
-            # При ошибке сохраняем для ручной проверки
+            # ✅ ИСПРАВЛЕНО: При ошибке сохраняем для ручной проверки
             await self._save_potential_client(
                 user_id=user_id,
-                template_id=message_data['template'].get('id'),
-                message_data=message_data['message'],
-                author_info={'telegram_id': 'error', 'username': 'error'},
-                chat_info={'chat_id': chat_id, 'chat_name': chat_name},
-                ai_analysis={'is_client': True, 'reasoning': f'Ошибка AI: {str(e)}', 'error': True},
-                matched_keywords=message_data['matched_keywords']
+                message=message_data['message'],
+                template=message_data['template'],
+                matched_keywords=message_data['matched_keywords'],
+                ai_result={'is_client': True, 'reasoning': f'Ошибка AI: {str(e)}'},
+                chat_id=chat_id,
+                chat_name=chat_name
             )
-    
+            
     async def _save_potential_client(
         self, 
         user_id: int, 
@@ -389,28 +389,26 @@ class ClientMonitoringService:
         try:
             client_data = {
                 'user_id': user_id,
-                'telegram_user_id': str(message.get('from_id', '')),
-                'username': message.get('username', ''),
-                'first_name': message.get('first_name', ''),
-                'last_name': message.get('last_name', ''),
-                'message_text': message.get('text', ''),  # ← ИСПРАВЛЕНО: было 'message'
-                'matched_template_id': template.get('id'),
-                'matched_keywords': matched_keywords,
-                'reasoning': ai_result.get('reasoning', ''),  # ← ИСПРАВЛЕНО: было 'ai_reasoning'
-                'intent_type': ai_result.get('intent_type', ''),
-                'chat_id': chat_id,
-                'chat_title': chat_name,
+                'author_id': str(message.get('from_id', '')),         # ✅ исправлено
+                'author_username': message.get('username', ''),       # ✅ исправлено
+                'message_text': message.get('text', ''),
                 'message_id': message.get('id', 0),
+                'chat_id': chat_id,
+                'chat_name': chat_name,                               # ✅ исправлено
+                'product_template_id': template.get('id'),            # ✅ исправлено
+                'template_name': template.get('name', ''),
+                'matched_keywords': matched_keywords,
+                'ai_explanation_text': ai_result.get('reasoning', ''), # ✅ исправлено
                 'client_status': 'new',
-                'created_at': datetime.now().isoformat(),
-                'updated_at': datetime.now().isoformat()
+                'notification_send': False,
+                'created_at': datetime.now().isoformat()
             }
-            # ← УБРАНО: 'ai_confidence' (система упрощена)
+            # ✅ Убраны поля: ai_confidence, ai_intent_type, updated_at, first_name, last_name
             
             result = supabase_client.table('potential_clients').insert(client_data).execute()
             
             if result.data:
-                logger.info(f"Saved potential client: {client_data.get('username', 'unknown')}")
+                logger.info(f"Saved potential client: {client_data.get('author_username', 'unknown')}")  # ✅ исправлено
             else:
                 logger.error("Failed to save potential client")
                 
@@ -453,11 +451,24 @@ class ClientMonitoringService:
         ai_result: Dict[str, Any]
     ) -> str:
         """Форматирование текста уведомления"""
+        
+        # Правильно извлекаем данные пользователя
+        username = message.get('username', 'unknown')
+        first_name = message.get('first_name', '')
+        chat_id = ai_result.get('chat_info', {}).get('chat_id', 'unknown')
+        chat_name = ai_result.get('chat_info', {}).get('chat_name', 'Unknown Chat')
+        message_id = message.get('id', 0)
+        matched_keywords = ai_result.get('matched_keywords', [])
+        
+        # Формируем ссылку на сообщение
+        message_link = f"https://t.me/c/{chat_id}/{message_id}" if chat_id != 'unknown' and message_id else "Ссылка недоступна"
+        
         return f"""🎯 НОВЫЙ ПОТЕНЦИАЛЬНЫЙ КЛИЕНТ
 
-    👤 Пользователь: @{message.get('username', 'unknown')} ({message.get('first_name', '')})
+    👤 Пользователь: @{username} ({first_name})
+    💬 Чат: {chat_name}
     📋 Шаблон: {template.get('name', 'Unknown')}
-    💭 Тип намерения: {ai_result.get('intent_type', 'unknown')}
+    🔑 Ключевые слова: {', '.join(matched_keywords)}
 
     📝 Сообщение:
     {message.get('text', '')[:300]}{'...' if len(message.get('text', '')) > 300 else ''}
@@ -465,5 +476,6 @@ class ClientMonitoringService:
     🤖 Анализ ИИ:
     {ai_result.get('reasoning', 'Нет объяснения')}
 
+    🔗 Ссылка: {message_link}
     ⏰ Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
     """

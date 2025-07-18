@@ -20,7 +20,6 @@ class ProductTemplateCreate(BaseModel):
     monitored_chats: Optional[List[str]] = []
     check_interval_minutes: Optional[int] = 5
     lookback_minutes: Optional[int] = 60
-    min_ai_confidence: Optional[int] = 7
     ai_prompt: str
 
 class ProductTemplateUpdate(BaseModel):
@@ -29,7 +28,6 @@ class ProductTemplateUpdate(BaseModel):
     monitored_chats: Optional[List[str]] = None
     check_interval_minutes: Optional[int] = None
     lookback_minutes: Optional[int] = None
-    min_ai_confidence: Optional[int] = None
     ai_prompt: Optional[str] = None
     is_active: Optional[bool] = None
 

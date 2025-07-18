@@ -8,7 +8,6 @@ export interface ProductTemplate {
   chat_ids: string[];
   check_interval_minutes: number;
   lookback_minutes: number;
-  min_ai_confidence: number;
   ai_prompt: string;
   is_active: boolean;
   created_at: string;
@@ -21,7 +20,6 @@ export interface ProductTemplateCreate {
   monitored_chats?: string[];
   check_interval_minutes?: number;
   lookback_minutes?: number;
-  min_ai_confidence?: number;
   ai_prompt: string;
 }
 
@@ -31,7 +29,6 @@ export interface ProductTemplateUpdate {
   monitored_chats?: string[];
   check_interval_minutes?: number;
   lookback_minutes?: number;
-  min_ai_confidence?: number;
   ai_prompt?: string;
   is_active?: boolean;
 }
