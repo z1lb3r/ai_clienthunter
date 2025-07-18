@@ -138,7 +138,7 @@ class ClientMonitoringService:
 
                         for msg_idx, message in enumerate(messages, 1):
                             try:
-                                message_text = message.get('message', '')
+                                message_text = message.get('text', '')
                                 
                                 logger.info(f"    📨 СООБЩЕНИЕ {msg_idx}/{len(messages)}:")
                                 logger.info(f"        📝 Текст: '{message_text}'")
@@ -321,7 +321,7 @@ class ClientMonitoringService:
                 'chat_name': chat_name
             }
             
-            message_text = message.get('message', '')
+            message_text = message.get('text', '')  # ← ИЗМЕНЕНО: было 'message'
             
             logger.info(f"🤖 AI анализ сообщения от @{author_info.get('username', 'unknown')} в чате {chat_name}")
             
@@ -342,12 +342,21 @@ class ClientMonitoringService:
                 # Сохраняем потенциального клиента
                 await self._save_potential_client(
                     user_id=user_id,
-                    template_id=template.get('id'),
-                    message_data=message,
-                    author_info=author_info,
-                    chat_info=chat_info,
-                    ai_analysis=ai_result,
-                    matched_keywords=matched_keywords
+                    message=message,
+                    template=template,
+                    matched_keywords=matched_keywords,
+                    ai_result=ai_result,
+                    chat_id=chat_id,
+                    chat_name=chat_name
+                )
+                
+                # ДОБАВЛЕНО: Отправляем уведомления
+                await self._send_notifications(
+                    user_id=user_id,
+                    message=message,
+                    template=template, 
+                    ai_result=ai_result,
+                    settings=settings
                 )
             else:
                 logger.info(f"❌ AI определил как НЕ КЛИЕНТА: {ai_result.get('reasoning', '')[:100]}...")
@@ -446,16 +455,16 @@ class ClientMonitoringService:
         """Форматирование текста уведомления"""
         return f"""🎯 НОВЫЙ ПОТЕНЦИАЛЬНЫЙ КЛИЕНТ
 
-👤 Пользователь: @{message.get('username', 'unknown')} ({message.get('first_name', '')})
-📋 Шаблон: {template.get('name', 'Unknown')}
-🎯 Уверенность ИИ: {ai_result.get('confidence', 0)}/10
-💭 Тип намерения: {ai_result.get('intent_type', 'unknown')}
+    👤 Пользователь: @{message.get('username', 'unknown')} ({message.get('first_name', '')})
+    📋 Шаблон: {template.get('name', 'Unknown')}
+    🎯 Уверенность ИИ: {ai_result.get('confidence', 0)}/10
+    💭 Тип намерения: {ai_result.get('intent_type', 'unknown')}
 
-📝 Сообщение:
-{message.get('message', '')[:300]}{'...' if len(message.get('message', '')) > 300 else ''}
+    📝 Сообщение:
+    {message.get('text', '')[:300]}{'...' if len(message.get('text', '')) > 300 else ''}
 
-🤖 Анализ ИИ:
-{ai_result.get('reasoning', 'Нет объяснения')}
+    🤖 Анализ ИИ:
+    {ai_result.get('reasoning', 'Нет объяснения')}
 
-⏰ Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-"""
+    ⏰ Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+    """
