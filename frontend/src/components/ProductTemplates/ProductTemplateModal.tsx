@@ -25,7 +25,6 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
     monitored_chats: [] as string[],
     check_interval_minutes: 5,
     lookback_minutes: 60,
-    min_ai_confidence: 7,
     ai_prompt: ''
   });
   const [currentKeyword, setCurrentKeyword] = useState('');
@@ -40,24 +39,11 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
 
   // Дефолтный промпт для новых шаблонов
   const defaultPrompt = `Ты - эксперт по анализу сообщений о валютном обмене.
-Твоя задача - найти КЛИЕНТОВ, которые хотят ОБМЕНЯТЬ валюту, а НЕ поставщиков услуг.
+ЗАДАЧА: Определить, хочет ли автор сообщения КУПИТЬ/ПРИОБРЕСТИ товары или услуги из указанных ключевых слов.
 
-ВАЖНО: Мы ищем людей, которые ХОТЯТ обменять свои деньги, а не тех, кто ПРЕДЛАГАЕТ услуги обмена.
+ВАЖНО: Мы ищем ПОКУПАТЕЛЕЙ, а не продавцов услуг!
 
-КРИТЕРИИ ОЦЕНКИ УВЕРЕННОСТИ (1-10):
-- 9-10: Срочная потребность в обмене ("Срочно нужно обменять 1000$ на баты", "Завтра лечу, где поменять?")
-- 7-8: Активный поиск обмена ("Хочу поменять USDT на баты", "Нужно обменять доллары")  
-- 5-6: Интерес к обмену ("Думаю обменять тезер", "Где лучше менять валюту?")
-- 3-4: Информационный интерес ("Какой курс бата?", "Сколько стоит обмен?")
-- 1-2: Поставщик услуг ("Меняю доллары на баты", "Обмен валют, выгодные курсы", "Предлагаю обмен")
-
-ТИПЫ НАМЕРЕНИЙ:
-- "обмен_клиент" - хочет обменять свою валюту
-- "обмен_поставщик" - предлагает услуги обмена (НЕ НАША ЦЕЛЕВАЯ АУДИТОРИЯ)
-- "информация" - интересуется курсами, условиями
-- "другое" - не связано с обменом валют
-
-Приоритет отдавай ключевым словам из шаблона - они указывают на то, что именно клиент хочет обменять.`;
+ОТВЕТ ТОЛЬКО: "ДА" или "НЕТ" + краткое объяснение (1-2 предложения).`;
 
   // Заполнение формы при редактировании
   useEffect(() => {
@@ -69,7 +55,6 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
           monitored_chats: [...(template.monitored_chats || [])],
           check_interval_minutes: template.check_interval_minutes || 5,
           lookback_minutes: template.lookback_minutes || 60,
-          min_ai_confidence: template.min_ai_confidence || 7,
           ai_prompt: template.ai_prompt || defaultPrompt
         });
       } else {
@@ -79,7 +64,6 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
           monitored_chats: [],
           check_interval_minutes: 5,
           lookback_minutes: 60,
-          min_ai_confidence: 7,
           ai_prompt: defaultPrompt
         });
       }
@@ -386,21 +370,7 @@ export const ProductTemplateModal: React.FC<ProductTemplateModalProps> = ({
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 disabled={isLoading}
               />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">
-                Порог ИИ (1-10)
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={formData.min_ai_confidence}
-                onChange={(e) => setFormData(prev => ({ ...prev, min_ai_confidence: parseInt(e.target.value) || 7 }))}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                disabled={isLoading}
-              />
-            </div>
+            </div>            
           </div>
         </div>
 

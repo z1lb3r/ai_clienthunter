@@ -310,10 +310,10 @@ class ClientMonitoringService:
             
             # Подготавливаем данные для ИИ
             author_info = {
-                'telegram_id': message.get('from_id', 'unknown'),
-                'username': message.get('username', ''),
-                'first_name': message.get('first_name', ''),
-                'last_name': message.get('last_name', '')
+               'telegram_id': message.get('from_id', 'unknown'),
+               'username': message.get('user_info', {}).get('username', ''),       # ✅ ПРАВИЛЬНО
+               'first_name': message.get('user_info', {}).get('first_name', ''),   # ✅ ПРАВИЛЬНО
+               'last_name': message.get('user_info', {}).get('last_name', '')      # ✅ ПРАВИЛЬНО
             }
             
             chat_info = {
@@ -389,16 +389,16 @@ class ClientMonitoringService:
         try:
             client_data = {
                 'user_id': user_id,
-                'author_id': str(message.get('from_id', '')),         # ✅ исправлено
-                'author_username': message.get('username', ''),       # ✅ исправлено
+                'author_id': str(message.get('from_id', '')),
+                'author_username': message.get('user_info', {}).get('username', ''),  
                 'message_text': message.get('text', ''),
                 'message_id': message.get('id', 0),
                 'chat_id': chat_id,
-                'chat_name': chat_name,                               # ✅ исправлено
-                'product_template_id': template.get('id'),            # ✅ исправлено
+                'chat_name': chat_name,
+                'product_template_id': template.get('id'),
                 'template_name': template.get('name', ''),
                 'matched_keywords': matched_keywords,
-                'ai_explanation_text': ai_result.get('reasoning', ''), # ✅ исправлено
+                'ai_explanation_text': ai_result.get('reasoning', ''),
                 'client_status': 'new',
                 'notification_send': False,
                 'created_at': datetime.now().isoformat()
@@ -408,7 +408,7 @@ class ClientMonitoringService:
             result = supabase_client.table('potential_clients').insert(client_data).execute()
             
             if result.data:
-                logger.info(f"Saved potential client: {client_data.get('author_username', 'unknown')}")  # ✅ исправлено
+                logger.info(f"Saved potential client: {client_data.get('author_username', 'unknown')}")  
             else:
                 logger.error("Failed to save potential client")
                 
@@ -452,16 +452,30 @@ class ClientMonitoringService:
     ) -> str:
         """Форматирование текста уведомления"""
         
-        # Правильно извлекаем данные пользователя
-        username = message.get('username', 'unknown')
-        first_name = message.get('first_name', '')
-        chat_id = ai_result.get('chat_info', {}).get('chat_id', 'unknown')
+        # ✅ Правильно извлекаем данные пользователя из структуры Telegram API
+        username = message.get('user_info', {}).get('username', 'unknown')
+        first_name = message.get('user_info', {}).get('first_name', '')
+        
+        # ✅ Данные чата берем из ai_result (там они есть)
         chat_name = ai_result.get('chat_info', {}).get('chat_name', 'Unknown Chat')
-        message_id = message.get('id', 0)
+        chat_id = ai_result.get('chat_info', {}).get('chat_id', 'unknown')
+        
+        # ✅ Ключевые слова из ai_result
         matched_keywords = ai_result.get('matched_keywords', [])
         
-        # Формируем ссылку на сообщение
-        message_link = f"https://t.me/c/{chat_id}/{message_id}" if chat_id != 'unknown' and message_id else "Ссылка недоступна"
+        # ✅ ID сообщения из message
+        message_id = message.get('message_id', message.get('id', 0))
+        
+        # ✅ Формируем правильную ссылку (убираем 'c/' для публичных чатов если нужно)
+        if chat_id != 'unknown' and message_id:
+            # Для приватных групп/каналов нужен формат /c/
+            if str(chat_id).startswith('-100'):
+                clean_chat_id = str(chat_id)[4:]  # убираем -100
+                message_link = f"https://t.me/c/{clean_chat_id}/{message_id}"
+            else:
+                message_link = f"https://t.me/{chat_id}/{message_id}"
+        else:
+            message_link = "Ссылка недоступна"
         
         return f"""🎯 НОВЫЙ ПОТЕНЦИАЛЬНЫЙ КЛИЕНТ
 

@@ -80,7 +80,6 @@ async def create_product_template(template: ProductTemplateCreate, user_id: int 
             'chat_ids': chat_ids,  # Конвертированные ID
             'check_interval_minutes': template.check_interval_minutes,
             'lookback_minutes': template.lookback_minutes,
-            'min_ai_confidence': template.min_ai_confidence,
             'ai_prompt': template.ai_prompt,
             'is_active': True,
             'created_at': datetime.now().isoformat(),
@@ -157,8 +156,6 @@ async def update_product_template(template_id: int, template: ProductTemplateUpd
             update_data['check_interval_minutes'] = template.check_interval_minutes
         if template.lookback_minutes is not None:
             update_data['lookback_minutes'] = template.lookback_minutes
-        if template.min_ai_confidence is not None:
-            update_data['min_ai_confidence'] = template.min_ai_confidence
         if template.ai_prompt is not None:
             if not template.ai_prompt.strip():
                 raise HTTPException(status_code=400, detail="AI prompt cannot be empty")
